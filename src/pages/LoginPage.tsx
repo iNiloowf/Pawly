@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { isSupabaseConfigured } from '../lib/supabase'
+import { isSupabaseConfigured, supabaseKeyError } from '../lib/supabase'
 
 export default function LoginPage() {
   const { signIn, signUp, continueAsGuest, cloudEnabled } = useAuth()
@@ -44,7 +44,18 @@ export default function LoginPage() {
         </p>
       </motion.div>
 
-      {!isSupabaseConfigured && (
+      {supabaseKeyError && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-900 text-sm"
+        >
+          <p className="font-medium">Wrong Supabase key</p>
+          <p className="mt-1 text-red-800/80">{supabaseKeyError}</p>
+        </motion.div>
+      )}
+
+      {!isSupabaseConfigured && !supabaseKeyError && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
