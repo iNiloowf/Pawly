@@ -19,6 +19,16 @@ import {
 } from '../services/cloudSync'
 
 const GUEST_KEY = 'pawly-guest'
+const AUTH_GATE_KEY = 'pawly-auth-gate'
+
+function getAuthGate(): boolean {
+  return sessionStorage.getItem(AUTH_GATE_KEY) === 'true'
+}
+
+function setAuthGate(value: boolean): void {
+  if (value) sessionStorage.setItem(AUTH_GATE_KEY, 'true')
+  else sessionStorage.removeItem(AUTH_GATE_KEY)
+}
 
 type AuthContextValue = {
   user: User | null
@@ -28,10 +38,12 @@ type AuthContextValue = {
   cloudEnabled: boolean
   syncing: boolean
   onboardingComplete: boolean
+  authGatePassed: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>
   signOut: () => Promise<void>
   continueAsGuest: () => void
+  passAuthGate: () => Promise<void>
   refreshCloud: () => Promise<void>
   completeOnboarding: (pet: Pet) => Promise<void>
 }
@@ -91,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isGuest, setIsGuest] = useState(getGuestMode)
   const [syncing, setSyncing] = useState(false)
   const [onboardingComplete, setOnboardingComplete] = useState(true)
+  const [authGatePassed, setAuthGatePassed] = useState(getAuthGate)
 
   const cloudEnabled = canUseCloud()
 
@@ -116,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
-      if (data.session?.user && cloudEnabled) {
+      if (data.session?.user && cloudEnabled && getAuthGate()) {
         runSync(data.session.user.id).finally(() => setLoading(false))
       } else {
         setOnboardingComplete(true)
@@ -126,9 +139,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession)
-      if (nextSession?.user && cloudEnabled) {
+      if (nextSession?.user && cloudEnabled && getAuthGate()) {
         runSync(nextSession.user.id)
-      } else {
+      } else if (!nextSession?.user) {
         setOnboardingComplete(true)
       }
     })
@@ -147,6 +160,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       throw error
     }
+    setAuthGate(true)
+    setAuthGatePassed(true)
   }, [])
 
   const signUp = useCallback(async (email: string, password: string) => {
@@ -159,6 +174,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const needsEmailConfirmation = !data.session
 
     if (data.user && data.session && cloudEnabled) {
+      setAuthGate(true)
+      setAuthGatePassed(true)
       setSyncing(true)
       try {
         await syncToCloud(data.user.id, getData())
@@ -171,17 +188,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { needsEmailConfirmation }
   }, [cloudEnabled])
 
+  const passAuthGate = useCallback(async () => {
+    setAuthGate(true)
+    setAuthGatePassed(true)
+    setGuestMode(false)
+    setIsGuest(false)
+    if (session?.user && cloudEnabled) {
+      await runSync(session.user.id)
+    }
+  }, [session, cloudEnabled, runSync])
+
   const signOut = useCallback(async () => {
     if (supabase) await supabase.auth.signOut()
     setSession(null)
     setGuestMode(false)
     setIsGuest(false)
+    setAuthGate(false)
+    setAuthGatePassed(false)
     setOnboardingComplete(true)
   }, [])
 
   const continueAsGuest = useCallback(() => {
     setGuestMode(true)
     setIsGuest(true)
+    setAuthGate(true)
+    setAuthGatePassed(true)
     setOnboardingComplete(true)
   }, [])
 
@@ -211,10 +242,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cloudEnabled,
       syncing,
       onboardingComplete,
+      authGatePassed,
       signIn,
       signUp,
       signOut,
       continueAsGuest,
+      passAuthGate,
       refreshCloud,
       completeOnboarding,
     }),
@@ -225,10 +258,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cloudEnabled,
       syncing,
       onboardingComplete,
+      authGatePassed,
       signIn,
       signUp,
       signOut,
       continueAsGuest,
+      passAuthGate,
       refreshCloud,
       completeOnboarding,
     ],

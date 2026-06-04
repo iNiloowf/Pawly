@@ -5,13 +5,25 @@ import { useAuth } from '../context/AuthContext'
 import { isSupabaseConfigured, supabaseKeyError } from '../lib/supabase'
 
 export default function LoginPage() {
-  const { signIn, signUp, continueAsGuest, cloudEnabled } = useAuth()
+  const { user, signIn, signUp, continueAsGuest, passAuthGate, cloudEnabled } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  const handleContinueSession = async () => {
+    setError(null)
+    setLoading(true)
+    try {
+      await passAuthGate()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,6 +85,27 @@ export default function LoginPage() {
           <p className="mt-1 text-amber-800/80">
             Add Supabase keys to <code className="text-xs bg-amber-100 px-1 rounded">.env.local</code> to enable login &amp; restore.
           </p>
+        </motion.div>
+      )}
+
+      {user && cloudEnabled && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 bg-white rounded-[var(--radius-card)] p-5 shadow-[var(--shadow-card)] border border-[var(--color-border)]"
+        >
+          <p className="text-sm text-[var(--color-text-secondary)]">Welcome back</p>
+          <p className="font-semibold text-[var(--color-text)] mt-1 truncate">{user.email}</p>
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.98 }}
+            onClick={handleContinueSession}
+            disabled={loading}
+            className="w-full mt-4 py-3.5 bg-[var(--color-primary)] text-white font-semibold rounded-[var(--radius-button)] flex items-center justify-center gap-2 disabled:opacity-70"
+          >
+            {loading ? <Loader2 size={18} className="animate-spin" /> : null}
+            Continue
+          </motion.button>
         </motion.div>
       )}
 

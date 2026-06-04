@@ -6,7 +6,7 @@ import OnboardingPage from '../pages/OnboardingPage'
 import App from '../App'
 
 export default function AppShell() {
-  const { user, loading, isGuest, syncing, onboardingComplete } = useAuth()
+  const { user, loading, isGuest, syncing, onboardingComplete, authGatePassed } = useAuth()
 
   if (loading) {
     return (
@@ -18,7 +18,7 @@ export default function AppShell() {
     )
   }
 
-  if (!user && !isGuest) {
+  if (!authGatePassed) {
     return <LoginPage />
   }
 
@@ -34,6 +34,10 @@ export default function AppShell() {
 
   if (user && !onboardingComplete) {
     return <OnboardingPage />
+  }
+
+  if (!user && !isGuest) {
+    return <LoginPage />
   }
 
   return (
