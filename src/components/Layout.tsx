@@ -3,7 +3,7 @@ import BottomNav from './BottomNav'
 
 export default function Layout() {
   return (
-    <div className="min-h-full pb-28">
+    <div className="min-h-full">
       <Outlet />
       <BottomNav />
     </div>

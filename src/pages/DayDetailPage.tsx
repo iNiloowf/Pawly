@@ -17,7 +17,7 @@ export default function DayDetailPage() {
 
   if (!entry) {
     return (
-      <div className="px-5 pt-12 text-center">
+      <div className="px-5 pt-12 pb-28 text-center">
         <p className="text-[var(--color-muted)]">Entry not found</p>
         <Link to="/history" className="text-[var(--color-primary)] mt-4 inline-block">Back to journal</Link>
       </div>
@@ -26,7 +26,7 @@ export default function DayDetailPage() {
 
   return (
     <div className="min-h-full">
-      <div className="px-5 pt-12 pb-4">
+      <div className="px-5 pt-12 pb-28">
         <Link to="/history" className="inline-flex items-center gap-1 text-[var(--color-primary)] font-medium mb-4">
           <ArrowLeft size={18} /> Journal
         </Link>

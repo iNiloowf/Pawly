@@ -20,7 +20,7 @@ export default function HistoryPage() {
   const startPad = monthStart.getDay()
 
   return (
-    <div className="px-5 pt-12 pb-4">
+    <div className="px-5 pt-12 pb-28">
       <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Journal</h1>
       <p className="text-sm text-[var(--color-text-secondary)] mb-6">
         {format(now, 'MMMM yyyy')}

@@ -121,104 +121,102 @@ export default function HomePage() {
   const isUpdate = Boolean(existing)
 
   return (
-    <div className="px-5 pt-12 pb-4">
+    <div className="home-screen px-4 pt-5 pb-2">
       {isUpdate && (
         <button
           type="button"
           onClick={() => setIsEditing(false)}
-          className="inline-flex items-center gap-1 text-[var(--color-primary)] font-medium mb-4"
+          className="inline-flex items-center gap-1 text-sm text-[var(--color-primary)] font-medium mb-2 shrink-0"
         >
-          <ArrowLeft size={18} /> Back
+          <ArrowLeft size={16} /> Back
         </button>
       )}
 
-      <div className="mb-6">
-        <p className="text-sm font-medium text-[var(--color-primary)] mb-1">Good {getGreeting()} 👋</p>
-        <PetCard pet={pet} />
+      <div className="shrink-0 mb-3">
+        <p className="text-xs font-medium text-[var(--color-primary)] mb-1.5">Good {getGreeting()} 👋</p>
+        <PetCard pet={pet} compact />
       </div>
 
       <motion.h2
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="text-xl font-bold text-[var(--color-text)] mb-4"
+        className="shrink-0 text-lg font-bold text-[var(--color-text)] mb-2"
       >
         {isUpdate ? `Update ${pet.name}'s check-in` : `How is ${pet.name} today?`}
       </motion.h2>
 
-      <div className="space-y-3 mb-6">
-        <SelectionCard title="Sleep" icon="😴" options={SLEEP_OPTIONS} value={sleep} onChange={setSleep} />
-        <SelectionCard title="Food" icon="🍖" options={FOOD_OPTIONS} value={food} onChange={setFood} />
-        <SelectionCard title="Activity" icon="🎾" options={ACTIVITY_OPTIONS} value={activity} onChange={setActivity} />
-        <SelectionCard title="Mood" icon="😊" options={MOOD_OPTIONS} value={mood} onChange={setMood} />
+      <div className="grid grid-cols-2 gap-2 flex-1 min-h-0 content-start auto-rows-min">
+        <SelectionCard title="Sleep" icon="😴" options={SLEEP_OPTIONS} value={sleep} onChange={setSleep} compact />
+        <SelectionCard title="Food" icon="🍖" options={FOOD_OPTIONS} value={food} onChange={setFood} compact />
+        <SelectionCard title="Activity" icon="🎾" options={ACTIVITY_OPTIONS} value={activity} onChange={setActivity} compact />
+        <SelectionCard title="Mood" icon="😊" options={MOOD_OPTIONS} value={mood} onChange={setMood} compact />
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
 
-      {photo ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="relative mb-4 rounded-[var(--radius-card)] overflow-hidden aspect-[4/3] shadow-[var(--shadow-card)]"
-        >
-          <img src={photo} alt="Today's photo" className="w-full h-full object-cover" />
-          <button
-            type="button"
-            onClick={removePhoto}
-            aria-label="Remove photo"
-            className="absolute top-3 right-3 w-8 h-8 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center text-white"
+      <div className="shrink-0 mt-2 space-y-2">
+        {photo ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative h-16 rounded-xl overflow-hidden shadow-[var(--shadow-soft)]"
           >
-            <X size={16} />
-          </button>
-        </motion.div>
-      ) : (
+            <img src={photo} alt="Today's photo" className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={removePhoto}
+              aria-label="Remove photo"
+              className="absolute top-1.5 right-1.5 w-7 h-7 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center text-white"
+            >
+              <X size={14} />
+            </button>
+          </motion.div>
+        ) : (
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.98 }}
+            onClick={() => fileRef.current?.click()}
+            className="w-full py-2.5 px-4 bg-white border-2 border-dashed border-[var(--color-primary-light)] rounded-xl flex items-center justify-center gap-2 text-sm text-[var(--color-primary)] font-semibold shadow-[var(--shadow-soft)]"
+          >
+            <Camera size={18} />
+            Add photo
+          </motion.button>
+        )}
+
+        {error && (
+          <p className="text-xs text-[var(--color-danger)] text-center">{error}</p>
+        )}
+
         <motion.button
           type="button"
-          whileTap={{ scale: 0.98 }}
-          onClick={() => fileRef.current?.click()}
-          className="w-full mb-4 py-4 px-6 bg-white border-2 border-dashed border-[var(--color-primary-light)] rounded-[var(--radius-card)] flex items-center justify-center gap-3 text-[var(--color-primary)] font-semibold shadow-[var(--shadow-soft)]"
+          whileTap={{ scale: 0.97 }}
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full py-3 bg-[var(--color-primary)] text-white font-semibold rounded-[var(--radius-button)] shadow-lg shadow-[rgba(124,92,255,0.35)] flex items-center justify-center gap-2 disabled:opacity-70 text-sm"
         >
-          <Camera size={22} />
-          Add Today&apos;s Photo
+          <AnimatePresence mode="wait">
+            {saved ? (
+              <motion.span
+                key="saved"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center gap-2"
+              >
+                <Check size={18} /> Saved!
+              </motion.span>
+            ) : saving ? (
+              <motion.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                Saving...
+              </motion.span>
+            ) : (
+              <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                {isUpdate ? 'Update Today' : 'Save Today'}
+              </motion.span>
+            )}
+          </AnimatePresence>
         </motion.button>
-      )}
-
-      {error && (
-        <p className="text-sm text-[var(--color-danger)] text-center mb-3">{error}</p>
-      )}
-
-      <motion.button
-        type="button"
-        whileTap={{ scale: 0.97 }}
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full py-4 bg-[var(--color-primary)] text-white font-semibold rounded-[var(--radius-button)] shadow-lg shadow-[rgba(124,92,255,0.35)] flex items-center justify-center gap-2 disabled:opacity-70"
-      >
-        <AnimatePresence mode="wait">
-          {saved ? (
-            <motion.span
-              key="saved"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex items-center gap-2"
-            >
-              <Check size={20} /> Saved!
-            </motion.span>
-          ) : saving ? (
-            <motion.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              Saving...
-            </motion.span>
-          ) : (
-            <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              {isUpdate ? 'Update Today' : 'Save Today'}
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </motion.button>
-
-      <p className="text-center text-xs text-[var(--color-muted)] mt-3">
-        One entry per day — you can edit or add a photo anytime today.
-      </p>
+      </div>
     </div>
   )
 }

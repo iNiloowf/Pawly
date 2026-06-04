@@ -76,7 +76,7 @@ export default function ProfilePage() {
   const physicalSummary = formatPetContext(pet)
 
   return (
-    <div className="px-5 pt-12 pb-4">
+    <div className="px-5 pt-12 pb-28">
       <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Profile</h1>
 
       <div className="flex flex-col items-center mb-8">
