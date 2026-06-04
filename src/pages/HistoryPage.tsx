@@ -48,17 +48,27 @@ export default function HistoryPage() {
                 key={key}
                 to={entry ? `/day/${key}` : '#'}
                 onClick={(e) => !entry && e.preventDefault()}
-                className={`aspect-square flex flex-col items-center justify-center rounded-xl text-xs relative ${
+                className={`aspect-square flex flex-col items-center justify-center rounded-xl text-xs relative overflow-hidden ${
                   entry ? 'cursor-pointer' : 'cursor-default'
                 } ${today ? 'ring-2 ring-[var(--color-primary)] ring-offset-1' : ''} ${
-                  entry ? 'bg-[var(--color-primary-soft)]' : inMonth ? 'hover:bg-gray-50' : 'opacity-40'
-                }`}
+                  entry && !entry.photo ? 'bg-[var(--color-primary-soft)]' : inMonth && !entry?.photo ? 'hover:bg-gray-50' : ''
+                } ${!inMonth ? 'opacity-40' : ''}`}
               >
-                <span className={`font-medium ${today ? 'text-[var(--color-primary)]' : ''}`}>
+                {entry?.photo && (
+                  <img
+                    src={entry.photo}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                )}
+                {entry?.photo && <div className="absolute inset-0 bg-black/20" />}
+                <span className={`relative z-10 font-medium ${today ? 'text-[var(--color-primary)]' : entry?.photo ? 'text-white drop-shadow' : ''}`}>
                   {format(day, 'd')}
                 </span>
                 {entry && (
-                  <span className="text-sm leading-none mt-0.5">{moodEmoji(entry.mood)}</span>
+                  <span className={`relative z-10 text-sm leading-none mt-0.5 ${entry.photo ? 'drop-shadow' : ''}`}>
+                    {moodEmoji(entry.mood)}
+                  </span>
                 )}
               </Link>
             )

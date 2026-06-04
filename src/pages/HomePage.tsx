@@ -1,11 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Check, X } from 'lucide-react'
 import PetCard from '../components/PetCard'
 import SelectionCard from '../components/SelectionCard'
 import { useAppData } from '../hooks/useAppData'
 import {
-  getTodayEntry,
   saveEntry,
   compressImage,
 } from '../store/storage'
@@ -24,8 +23,11 @@ import {
 } from '../types'
 
 export default function HomePage() {
-  const { pet } = useAppData()
-  const existing = getTodayEntry()
+  const { pet, entries } = useAppData()
+  const existing = useMemo(
+    () => entries.find((e) => e.date === todayKey()),
+    [entries],
+  )
 
   const [sleep, setSleep] = useState<SleepLevel>(existing?.sleep ?? DEFAULT_ENTRY.sleep)
   const [food, setFood] = useState<FoodLevel>(existing?.food ?? DEFAULT_ENTRY.food)

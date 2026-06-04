@@ -11,6 +11,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { getData, replaceData, setSyncUserId, updatePet } from '../store/storage'
 import type { Pet } from '../types'
+import type { DailyEntry } from '../types'
 import {
   canUseCloud,
   completeOnboarding as saveOnboarding,
@@ -63,6 +64,23 @@ function emptyPet(): Pet {
   return { name: '', breed: undefined, photo: undefined }
 }
 
+function mergeEntries(local: DailyEntry[], cloud: DailyEntry[]): DailyEntry[] {
+  const map = new Map<string, DailyEntry>()
+  for (const e of cloud) map.set(e.date, { ...e })
+  for (const e of local) {
+    const existing = map.get(e.date)
+    if (!existing) {
+      map.set(e.date, e)
+    } else {
+      map.set(e.date, {
+        ...existing,
+        photo: existing.photo || e.photo,
+      })
+    }
+  }
+  return [...map.values()].sort((a, b) => b.date.localeCompare(a.date))
+}
+
 async function mergeOnLogin(userId: string): Promise<boolean> {
   const local = getData()
   const cloud = await restoreFromCloud(userId)
@@ -73,10 +91,6 @@ async function mergeOnLogin(userId: string): Promise<boolean> {
   }
 
   if (cloud.entries.length > 0) {
-    const merged = new Map(cloud.entries.map((e) => [e.date, e]))
-    for (const e of local.entries) {
-      if (!merged.has(e.date)) merged.set(e.date, e)
-    }
     const pet = cloud.onboardingComplete
       ? cloud.pet.name
         ? cloud.pet
@@ -84,7 +98,7 @@ async function mergeOnLogin(userId: string): Promise<boolean> {
       : emptyPet()
     replaceData({
       pet,
-      entries: [...merged.values()].sort((a, b) => b.date.localeCompare(a.date)),
+      entries: mergeEntries(local.entries, cloud.entries),
     })
     await syncToCloud(userId, getData())
     return cloud.onboardingComplete
@@ -92,7 +106,7 @@ async function mergeOnLogin(userId: string): Promise<boolean> {
 
   replaceData({
     pet: cloud.onboardingComplete ? cloud.pet : emptyPet(),
-    entries: cloud.entries,
+    entries: mergeEntries(local.entries, cloud.entries),
   })
   return cloud.onboardingComplete
 }
