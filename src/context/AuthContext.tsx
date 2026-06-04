@@ -171,9 +171,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      const { data: { user }, error } = await supabase.auth.getUser()
+      const { data: { user }, error } = await supabase!.auth.getUser()
       if (error || !user) {
-        await supabase.auth.signOut()
+        await supabase!.auth.signOut()
         setSession(null)
         setOnboardingComplete(true)
         return
