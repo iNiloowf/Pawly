@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { CheckCircle2, CalendarDays, Images, Pencil, Camera } from 'lucide-react'
+import { CheckCircle2, CalendarDays, Images, Pencil, Camera, X } from 'lucide-react'
 import PetCard from '../components/PetCard'
 import type { DailyEntry, Pet } from '../types'
 import {
@@ -16,9 +16,10 @@ interface TodayCompleteProps {
   entry: DailyEntry
   onEdit: () => void
   onAddPhoto: () => void
+  onRemovePhoto: () => void
 }
 
-export default function TodayComplete({ pet, entry, onEdit, onAddPhoto }: TodayCompleteProps) {
+export default function TodayComplete({ pet, entry, onEdit, onAddPhoto, onRemovePhoto }: TodayCompleteProps) {
   return (
     <div className="px-5 pt-12 pb-4">
       <div className="mb-6">
@@ -44,11 +45,21 @@ export default function TodayComplete({ pet, entry, onEdit, onAddPhoto }: TodayC
         </div>
 
         {entry.photo ? (
-          <img
-            src={entry.photo}
-            alt="Today's photo"
-            className="w-full aspect-[4/3] object-cover rounded-2xl mb-4 shadow-[var(--shadow-soft)]"
-          />
+          <div className="relative mb-4 rounded-2xl overflow-hidden shadow-[var(--shadow-soft)]">
+            <img
+              src={entry.photo}
+              alt="Today's photo"
+              className="w-full aspect-[4/3] object-cover"
+            />
+            <button
+              type="button"
+              onClick={onRemovePhoto}
+              aria-label="Remove photo"
+              className="absolute top-3 right-3 w-9 h-9 bg-black/45 backdrop-blur-sm rounded-full flex items-center justify-center text-white"
+            >
+              <X size={18} />
+            </button>
+          </div>
         ) : (
           <button
             type="button"

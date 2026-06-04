@@ -35,6 +35,16 @@ export async function loadPhotoRef(key: string): Promise<string | undefined> {
   })
 }
 
+export async function deletePhotoRef(key: string): Promise<void> {
+  const db = await openDb()
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite')
+    tx.objectStore(STORE).delete(key)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
 export function entryPhotoKey(date: string): string {
   return `entry-${date}`
 }

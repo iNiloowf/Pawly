@@ -1,7 +1,7 @@
 import type { AppData, DailyEntry, Pet } from '../types'
 import { DEFAULT_PET, todayKey } from '../types'
 import { canUseCloud, pushEntry, pushPet } from '../services/cloudSync'
-import { entryPhotoKey, hydrateEntryPhotos, loadPhotoRef, savePhotoRef } from './photoStore'
+import { entryPhotoKey, hydrateEntryPhotos, loadPhotoRef, savePhotoRef, deletePhotoRef } from './photoStore'
 
 const STORAGE_KEY = 'pawly-data'
 
@@ -53,8 +53,11 @@ function persistCache(): void {
     console.warn('[Pawly] localStorage save failed — photos kept in IndexedDB', err)
   }
   for (const entry of cache.entries) {
+    const key = entryPhotoKey(entry.date)
     if (entry.photo?.startsWith('data:')) {
-      savePhotoRef(entryPhotoKey(entry.date), entry.photo).catch(console.error)
+      savePhotoRef(key, entry.photo).catch(console.error)
+    } else if (!entry.photo) {
+      deletePhotoRef(key).catch(console.error)
     }
   }
   if (cache.pet.photo?.startsWith('data:')) {

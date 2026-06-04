@@ -49,6 +49,21 @@ export default function HomePage() {
     setIsEditing(true)
   }
 
+  const buildEntry = (overrides: Partial<DailyEntry> = {}): DailyEntry => ({
+    date: today,
+    sleep: existing?.sleep ?? sleep,
+    food: existing?.food ?? food,
+    activity: existing?.activity ?? activity,
+    mood: existing?.mood ?? mood,
+    photo,
+    ...overrides,
+  })
+
+  const removePhoto = () => {
+    setPhoto(undefined)
+    saveEntry(buildEntry({ photo: undefined }))
+  }
+
   const startAddPhoto = () => {
     if (existing) loadFormFromEntry(existing)
     setIsEditing(true)
@@ -62,6 +77,7 @@ export default function HomePage() {
         entry={existing}
         onEdit={startEdit}
         onAddPhoto={startAddPhoto}
+        onRemovePhoto={removePhoto}
       />
     )
   }
@@ -73,14 +89,7 @@ export default function HomePage() {
     const compressed = await compressImage(file)
     setPhoto(compressed)
 
-    const entry: DailyEntry = {
-      date: today,
-      sleep: existing?.sleep ?? sleep,
-      food: existing?.food ?? food,
-      activity: existing?.activity ?? activity,
-      mood: existing?.mood ?? mood,
-      photo: compressed,
-    }
+    const entry = buildEntry({ photo: compressed })
     saveEntry(entry)
     if (existing) setIsEditing(false)
   }
@@ -154,7 +163,8 @@ export default function HomePage() {
           <img src={photo} alt="Today's photo" className="w-full h-full object-cover" />
           <button
             type="button"
-            onClick={() => setPhoto(undefined)}
+            onClick={removePhoto}
+            aria-label="Remove photo"
             className="absolute top-3 right-3 w-8 h-8 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center text-white"
           >
             <X size={16} />
