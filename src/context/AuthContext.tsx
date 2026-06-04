@@ -9,7 +9,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { getData, replaceData, setSyncUserId, updatePet, hydratePhotosFromIdb } from '../store/storage'
+import { getData, replaceData, setSyncContext, updatePet, hydratePhotosFromIdb } from '../store/storage'
 import type { Pet } from '../types'
 import type { DailyEntry } from '../types'
 import {
@@ -17,7 +17,18 @@ import {
   completeOnboarding as saveOnboarding,
   restoreFromCloud,
   syncToCloud,
+  setDataOwnerId,
+  markOnboardingLocal,
 } from '../services/cloudSync'
+import {
+  acceptHouseholdInvite,
+  captureInviteFromUrl,
+  clearPendingInviteToken,
+  fetchHouseholdInfo,
+  getPendingInviteToken,
+  resolveDataOwnerId,
+  type HouseholdInfo,
+} from '../services/householdSync'
 
 const GUEST_KEY = 'pawly-guest'
 const AUTH_GATE_KEY = 'pawly-auth-gate'
@@ -47,6 +58,9 @@ type AuthContextValue = {
   passAuthGate: () => Promise<void>
   refreshCloud: () => Promise<void>
   completeOnboarding: (pet: Pet) => Promise<void>
+  householdInfo: HouseholdInfo | null
+  refreshHousehold: () => Promise<void>
+  pendingInvite: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -93,7 +107,34 @@ function mergePet(local: Pet, cloud: Pet): Pet {
 
 async function mergeOnLogin(userId: string): Promise<boolean> {
   const local = getData()
-  const cloud = await restoreFromCloud(userId)
+  let joinedAsMember = false
+  const pendingInvite = getPendingInviteToken()
+
+  if (pendingInvite && canUseCloud()) {
+    try {
+      await acceptHouseholdInvite(userId, pendingInvite)
+      joinedAsMember = true
+      markOnboardingLocal(userId)
+    } catch (err) {
+      console.warn('[Pawly] Could not accept household invite', err)
+    } finally {
+      clearPendingInviteToken()
+    }
+  }
+
+  const ownerId = canUseCloud() ? await resolveDataOwnerId(userId) : userId
+  setSyncContext(userId, ownerId)
+  setDataOwnerId(ownerId)
+
+  const cloud = await restoreFromCloud(userId, ownerId)
+
+  if (joinedAsMember) {
+    replaceData({
+      pet: cloud.pet,
+      entries: mergeEntries(local.entries, cloud.entries),
+    })
+    return true
+  }
 
   if (cloud.entries.length === 0 && local.entries.length > 0) {
     await syncToCloud(userId, local)
@@ -141,26 +182,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false)
   const [onboardingComplete, setOnboardingComplete] = useState(true)
   const [authGatePassed, setAuthGatePassed] = useState(getAuthGate)
+  const [householdInfo, setHouseholdInfo] = useState<HouseholdInfo | null>(null)
+  const [pendingInvite, setPendingInvite] = useState(() => Boolean(getPendingInviteToken()))
 
   const cloudEnabled = canUseCloud()
+
+  const refreshHousehold = useCallback(async () => {
+    if (!session?.user || !cloudEnabled) {
+      setHouseholdInfo(null)
+      return
+    }
+    try {
+      const info = await fetchHouseholdInfo(session.user.id)
+      setHouseholdInfo(info)
+    } catch {
+      setHouseholdInfo(null)
+    }
+  }, [session?.user, cloudEnabled])
 
   const runSync = useCallback(async (userId: string) => {
     setSyncing(true)
     try {
       const done = await mergeOnLogin(userId)
       setOnboardingComplete(done)
+      if (cloudEnabled) {
+        const info = await fetchHouseholdInfo(userId)
+        setHouseholdInfo(info)
+      }
     } finally {
       setSyncing(false)
     }
-  }, [])
+  }, [cloudEnabled])
 
   useEffect(() => {
+    captureInviteFromUrl()
+    setPendingInvite(Boolean(getPendingInviteToken()))
     hydratePhotosFromIdb()
   }, [])
 
   useEffect(() => {
-    setSyncUserId(session?.user?.id ?? null)
-  }, [session?.user?.id])
+    if (!session?.user) {
+      setSyncContext(null, null)
+      setDataOwnerId(null)
+    }
+  }, [session?.user])
 
   const signOut = useCallback(async () => {
     const userId = session?.user?.id
@@ -172,6 +237,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthGate(false)
     setAuthGatePassed(false)
     setOnboardingComplete(true)
+    setHouseholdInfo(null)
+    setPendingInvite(false)
   }, [session?.user?.id])
 
   useEffect(() => {
@@ -241,13 +308,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.user && data.session && cloudEnabled) {
       setAuthGate(true)
       setAuthGatePassed(true)
-      setSyncing(true)
-      try {
-        await syncToCloud(data.user.id, getData())
-        setOnboardingComplete(false)
-      } finally {
-        setSyncing(false)
-      }
     }
 
     return { needsEmailConfirmation }
@@ -313,6 +373,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       passAuthGate,
       refreshCloud,
       completeOnboarding,
+      householdInfo,
+      refreshHousehold,
+      pendingInvite,
     }),
     [
       session,
@@ -329,6 +392,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       passAuthGate,
       refreshCloud,
       completeOnboarding,
+      householdInfo,
+      refreshHousehold,
+      pendingInvite,
     ],
   )
 

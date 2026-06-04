@@ -47,6 +47,16 @@ async function uploadPhoto(userId: string, path: string, dataUrl: string): Promi
 
 const ONBOARDING_KEY = (userId: string) => `pawly-onboarded-${userId}`
 
+let activeDataOwnerId: string | null = null
+
+export function setDataOwnerId(ownerId: string | null): void {
+  activeDataOwnerId = ownerId
+}
+
+function dataOwner(userId: string): string {
+  return activeDataOwnerId ?? userId
+}
+
 export function markOnboardingLocal(userId: string): void {
   localStorage.setItem(ONBOARDING_KEY(userId), 'true')
 }
@@ -56,24 +66,31 @@ export function isOnboardingLocal(userId: string): boolean {
 }
 
 /** Pull pet + entries + photo URLs from Supabase (cloud restore). */
-export async function restoreFromCloud(userId: string): Promise<AppData & { onboardingComplete: boolean }> {
+export async function restoreFromCloud(
+  userId: string,
+  ownerId?: string,
+): Promise<AppData & { onboardingComplete: boolean }> {
   if (!supabase) throw new Error('Supabase not configured')
+
+  const dataOwnerId = ownerId ?? dataOwner(userId)
 
   const { data: profile, error: profileErr } = await supabase
     .from('profiles')
     .select('pet_name, pet_breed, pet_photo_url, pet_age, pet_body_condition_score, onboarding_complete')
-    .eq('id', userId)
+    .eq('id', dataOwnerId)
     .maybeSingle()
 
   if (profileErr) throw profileErr
 
   const onboardingComplete =
-    isOnboardingLocal(userId) || profile?.onboarding_complete === true
+    isOnboardingLocal(userId) ||
+    profile?.onboarding_complete === true ||
+    (dataOwnerId !== userId && Boolean(profile))
 
   const { data: rows, error: entriesErr } = await supabase
     .from('daily_entries')
     .select('entry_date, sleep, food, activity, mood, photo_url')
-    .eq('user_id', userId)
+    .eq('user_id', dataOwnerId)
     .order('entry_date', { ascending: false })
 
   if (entriesErr) throw entriesErr
@@ -102,13 +119,15 @@ export async function restoreFromCloud(userId: string): Promise<AppData & { onbo
 export async function syncToCloud(userId: string, data: AppData): Promise<void> {
   if (!supabase) throw new Error('Supabase not configured')
 
+  const ownerId = dataOwner(userId)
+
   let petPhotoUrl = data.pet.photo
   if (data.pet.photo?.startsWith('data:')) {
-    petPhotoUrl = await uploadPhoto(userId, 'pet.jpg', data.pet.photo)
+    petPhotoUrl = await uploadPhoto(ownerId, 'pet.jpg', data.pet.photo)
   }
 
   const { error: profileErr } = await supabase.from('profiles').upsert({
-    id: userId,
+    id: ownerId,
     pet_name: data.pet.name,
     pet_breed: data.pet.breed ?? null,
     pet_photo_url: petPhotoUrl ?? null,
@@ -120,20 +139,22 @@ export async function syncToCloud(userId: string, data: AppData): Promise<void> 
   if (profileErr) throw profileErr
 
   for (const entry of data.entries) {
-    await pushEntry(userId, entry)
+    await pushEntry(ownerId, entry)
   }
 }
 
 export async function pushPet(userId: string, pet: Pet, onboardingComplete?: boolean): Promise<void> {
   if (!supabase) return
 
+  const ownerId = dataOwner(userId)
+
   let petPhotoUrl = pet.photo
   if (pet.photo?.startsWith('data:')) {
-    petPhotoUrl = await uploadPhoto(userId, 'pet.jpg', pet.photo)
+    petPhotoUrl = await uploadPhoto(ownerId, 'pet.jpg', pet.photo)
   }
 
   const { error } = await supabase.from('profiles').upsert({
-    id: userId,
+    id: ownerId,
     pet_name: pet.name,
     pet_breed: pet.breed ?? null,
     pet_photo_url: petPhotoUrl ?? null,
@@ -167,14 +188,16 @@ export async function fetchOnboardingComplete(userId: string): Promise<boolean> 
 export async function pushEntry(userId: string, entry: DailyEntry): Promise<void> {
   if (!supabase) return
 
+  const ownerId = dataOwner(userId)
+
   let photoUrl = entry.photo?.startsWith('http') ? entry.photo : undefined
   if (entry.photo?.startsWith('data:')) {
-    photoUrl = (await uploadPhoto(userId, `entries/${entry.date}.jpg`, entry.photo)) ?? photoUrl
+    photoUrl = (await uploadPhoto(ownerId, `entries/${entry.date}.jpg`, entry.photo)) ?? photoUrl
   }
 
   const { error } = await supabase.from('daily_entries').upsert(
     {
-      user_id: userId,
+      user_id: ownerId,
       entry_date: entry.date,
       sleep: entry.sleep,
       food: entry.food,

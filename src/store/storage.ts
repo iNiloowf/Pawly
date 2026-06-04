@@ -6,10 +6,22 @@ import { entryPhotoKey, hydrateEntryPhotos, loadPhotoRef, savePhotoRef, deletePh
 const STORAGE_KEY = 'pawly-data'
 
 let syncUserId: string | null = null
+let dataOwnerId: string | null = null
 let snapshotVersion = 0
 
 export function setSyncUserId(userId: string | null): void {
   syncUserId = userId
+  if (!userId) dataOwnerId = null
+}
+
+export function setSyncContext(userId: string | null, ownerId: string | null): void {
+  syncUserId = userId
+  dataOwnerId = ownerId ?? userId
+}
+
+function cloudOwnerId(): string | null {
+  if (!syncUserId) return null
+  return dataOwnerId ?? syncUserId
 }
 
 export function getSnapshotVersion(): number {
@@ -130,7 +142,7 @@ export function updatePet(pet: Partial<Pet>): Pet {
   cache = { ...cache, pet: { ...cache.pet, ...pet } }
   persistCache()
   if (syncUserId && canUseCloud()) {
-    pushPet(syncUserId, cache.pet).catch(console.error)
+    pushPet(cloudOwnerId()!, cache.pet).catch(console.error)
   }
   return cache.pet
 }
@@ -156,7 +168,7 @@ export function saveEntry(entry: DailyEntry): DailyEntry {
   cache = { ...cache, entries }
   persistCache()
   if (syncUserId && canUseCloud()) {
-    pushEntry(syncUserId, entry).catch(console.error)
+    pushEntry(cloudOwnerId()!, entry).catch(console.error)
   }
   return entry
 }

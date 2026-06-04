@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { isSupabaseConfigured, supabaseKeyError } from '../lib/supabase'
 
 export default function LoginPage() {
-  const { user, signIn, signUp, continueAsGuest, passAuthGate, cloudEnabled } = useAuth()
+  const { user, signIn, signUp, continueAsGuest, passAuthGate, cloudEnabled, pendingInvite } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -84,6 +84,19 @@ export default function LoginPage() {
           <p className="font-medium">Cloud not configured yet</p>
           <p className="mt-1 text-amber-800/80">
             Add Supabase keys to <code className="text-xs bg-amber-100 px-1 rounded">.env.local</code> to enable login &amp; restore.
+          </p>
+        </motion.div>
+      )}
+
+      {pendingInvite && cloudEnabled && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 rounded-2xl bg-[var(--color-primary-soft)] border border-[var(--color-primary-light)] text-sm"
+        >
+          <p className="font-semibold text-[var(--color-primary)]">Shared pet journal invite</p>
+          <p className="mt-1 text-[var(--color-text-secondary)] leading-relaxed">
+            Create an account or sign in to join your partner&apos;s Pawly and share the same dog journal.
           </p>
         </motion.div>
       )}

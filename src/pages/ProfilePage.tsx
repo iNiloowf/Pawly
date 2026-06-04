@@ -4,6 +4,7 @@ import { Camera, TrendingUp, Moon, Activity, LogOut, ChevronDown, Info, Utensils
 import { useAppData } from '../hooks/useAppData'
 import { useAuth } from '../context/AuthContext'
 import PhysicalStatsFields from '../components/PhysicalStatsFields'
+import JointAccountSection from '../components/JointAccountSection'
 import { updatePet, getWeekEntries, moodScore, levelScore, compressImage } from '../store/storage'
 import { moodEmoji } from '../types'
 import { activitySubtitle, buildWeeklyInsights, foodSubtitle, formatPetContext } from '../lib/petInsights'
@@ -228,6 +229,8 @@ export default function ProfilePage() {
             : `Keep building the habit — check in daily with ${name}!`}
         </p>
       </div>
+
+      <JointAccountSection />
 
       {user && (
         <button
