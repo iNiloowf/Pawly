@@ -9,8 +9,14 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { getData, replaceData, setSyncUserId } from '../store/storage'
-import { canUseCloud, restoreFromCloud, syncToCloud } from '../services/cloudSync'
+import { getData, replaceData, setSyncUserId, updatePet } from '../store/storage'
+import type { Pet } from '../types'
+import {
+  canUseCloud,
+  completeOnboarding as saveOnboarding,
+  restoreFromCloud,
+  syncToCloud,
+} from '../services/cloudSync'
 
 const GUEST_KEY = 'pawly-guest'
 
@@ -21,11 +27,13 @@ type AuthContextValue = {
   isGuest: boolean
   cloudEnabled: boolean
   syncing: boolean
+  onboardingComplete: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>
   signOut: () => Promise<void>
   continueAsGuest: () => void
   refreshCloud: () => Promise<void>
+  completeOnboarding: (pet: Pet) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -39,13 +47,17 @@ function setGuestMode(value: boolean): void {
   else sessionStorage.removeItem(GUEST_KEY)
 }
 
-async function mergeOnLogin(userId: string): Promise<void> {
+function emptyPet(): Pet {
+  return { name: '', breed: undefined, photo: undefined }
+}
+
+async function mergeOnLogin(userId: string): Promise<boolean> {
   const local = getData()
   const cloud = await restoreFromCloud(userId)
 
   if (cloud.entries.length === 0 && local.entries.length > 0) {
     await syncToCloud(userId, local)
-    return
+    return cloud.onboardingComplete
   }
 
   if (cloud.entries.length > 0) {
@@ -53,15 +65,24 @@ async function mergeOnLogin(userId: string): Promise<void> {
     for (const e of local.entries) {
       if (!merged.has(e.date)) merged.set(e.date, e)
     }
+    const pet = cloud.onboardingComplete
+      ? cloud.pet.name
+        ? cloud.pet
+        : local.pet
+      : emptyPet()
     replaceData({
-      pet: cloud.pet.name ? cloud.pet : local.pet,
+      pet,
       entries: [...merged.values()].sort((a, b) => b.date.localeCompare(a.date)),
     })
     await syncToCloud(userId, getData())
-    return
+    return cloud.onboardingComplete
   }
 
-  replaceData(cloud)
+  replaceData({
+    pet: cloud.onboardingComplete ? cloud.pet : emptyPet(),
+    entries: cloud.entries,
+  })
+  return cloud.onboardingComplete
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -69,8 +90,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isGuest, setIsGuest] = useState(getGuestMode)
   const [syncing, setSyncing] = useState(false)
+  const [onboardingComplete, setOnboardingComplete] = useState(true)
 
   const cloudEnabled = canUseCloud()
+
+  const runSync = useCallback(async (userId: string) => {
+    setSyncing(true)
+    try {
+      const done = await mergeOnLogin(userId)
+      setOnboardingComplete(done)
+    } finally {
+      setSyncing(false)
+    }
+  }, [])
 
   useEffect(() => {
     setSyncUserId(session?.user?.id ?? null)
@@ -85,8 +117,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       if (data.session?.user && cloudEnabled) {
-        mergeOnLogin(data.session.user.id).finally(() => setLoading(false))
+        runSync(data.session.user.id).finally(() => setLoading(false))
       } else {
+        setOnboardingComplete(true)
         setLoading(false)
       }
     })
@@ -94,13 +127,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession)
       if (nextSession?.user && cloudEnabled) {
-        setSyncing(true)
-        mergeOnLogin(nextSession.user.id).finally(() => setSyncing(false))
+        runSync(nextSession.user.id)
+      } else {
+        setOnboardingComplete(true)
       }
     })
 
     return () => sub.subscription.unsubscribe()
-  }, [cloudEnabled])
+  }, [cloudEnabled, runSync])
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) throw new Error('Cloud login is not configured')
@@ -125,14 +159,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const needsEmailConfirmation = !data.session
 
     if (data.user && data.session && cloudEnabled) {
-      const local = getData()
-      if (local.entries.length > 0 || local.pet.photo) {
-        setSyncing(true)
-        try {
-          await syncToCloud(data.user.id, local)
-        } finally {
-          setSyncing(false)
-        }
+      setSyncing(true)
+      try {
+        await syncToCloud(data.user.id, getData())
+        setOnboardingComplete(false)
+      } finally {
+        setSyncing(false)
       }
     }
 
@@ -144,22 +176,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null)
     setGuestMode(false)
     setIsGuest(false)
+    setOnboardingComplete(true)
   }, [])
 
   const continueAsGuest = useCallback(() => {
     setGuestMode(true)
     setIsGuest(true)
+    setOnboardingComplete(true)
   }, [])
 
   const refreshCloud = useCallback(async () => {
     if (!session?.user || !cloudEnabled) return
-    setSyncing(true)
-    try {
-      await mergeOnLogin(session.user.id)
-    } finally {
-      setSyncing(false)
-    }
-  }, [session, cloudEnabled])
+    await runSync(session.user.id)
+  }, [session, cloudEnabled, runSync])
+
+  const completeOnboarding = useCallback(
+    async (pet: Pet) => {
+      if (!session?.user) return
+      updatePet(pet)
+      if (cloudEnabled) {
+        await saveOnboarding(session.user.id, pet)
+      }
+      setOnboardingComplete(true)
+    },
+    [session, cloudEnabled],
+  )
 
   const value = useMemo(
     () => ({
@@ -169,13 +210,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isGuest,
       cloudEnabled,
       syncing,
+      onboardingComplete,
       signIn,
       signUp,
       signOut,
       continueAsGuest,
       refreshCloud,
+      completeOnboarding,
     }),
-    [session, loading, isGuest, cloudEnabled, syncing, signIn, signUp, signOut, continueAsGuest, refreshCloud],
+    [
+      session,
+      loading,
+      isGuest,
+      cloudEnabled,
+      syncing,
+      onboardingComplete,
+      signIn,
+      signUp,
+      signOut,
+      continueAsGuest,
+      refreshCloud,
+      completeOnboarding,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

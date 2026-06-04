@@ -2,10 +2,11 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import LoginPage from '../pages/LoginPage'
+import OnboardingPage from '../pages/OnboardingPage'
 import App from '../App'
 
 export default function AppShell() {
-  const { user, loading, isGuest, syncing } = useAuth()
+  const { user, loading, isGuest, syncing, onboardingComplete } = useAuth()
 
   if (loading) {
     return (
@@ -19,6 +20,20 @@ export default function AppShell() {
 
   if (!user && !isGuest) {
     return <LoginPage />
+  }
+
+  if (user && syncing) {
+    return (
+      <div className="min-h-full flex flex-col items-center justify-center gap-4 bg-[var(--color-surface)]">
+        <img src="/icon-192.png" alt="" className="w-20 h-20 rounded-[22px] shadow-[var(--shadow-soft)]" />
+        <Loader2 size={28} className="animate-spin text-[var(--color-primary)]" />
+        <p className="text-sm text-[var(--color-text-secondary)]">Setting up your account…</p>
+      </div>
+    )
+  }
+
+  if (user && !onboardingComplete) {
+    return <OnboardingPage />
   }
 
   return (

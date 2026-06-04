@@ -26,17 +26,30 @@ async function uploadPhoto(userId: string, path: string, dataUrl: string): Promi
   return data.publicUrl
 }
 
+const ONBOARDING_KEY = (userId: string) => `pawly-onboarded-${userId}`
+
+export function markOnboardingLocal(userId: string): void {
+  localStorage.setItem(ONBOARDING_KEY(userId), 'true')
+}
+
+export function isOnboardingLocal(userId: string): boolean {
+  return localStorage.getItem(ONBOARDING_KEY(userId)) === 'true'
+}
+
 /** Pull pet + entries + photo URLs from Supabase (cloud restore). */
-export async function restoreFromCloud(userId: string): Promise<AppData> {
+export async function restoreFromCloud(userId: string): Promise<AppData & { onboardingComplete: boolean }> {
   if (!supabase) throw new Error('Supabase not configured')
 
   const { data: profile, error: profileErr } = await supabase
     .from('profiles')
-    .select('pet_name, pet_breed, pet_photo_url')
+    .select('pet_name, pet_breed, pet_photo_url, onboarding_complete')
     .eq('id', userId)
     .maybeSingle()
 
   if (profileErr) throw profileErr
+
+  const onboardingComplete =
+    isOnboardingLocal(userId) || profile?.onboarding_complete === true
 
   const { data: rows, error: entriesErr } = await supabase
     .from('daily_entries')
@@ -61,7 +74,7 @@ export async function restoreFromCloud(userId: string): Promise<AppData> {
     photo: r.photo_url ?? undefined,
   }))
 
-  return { pet, entries }
+  return { pet, entries, onboardingComplete: profile ? onboardingComplete : false }
 }
 
 /** Push all local data to Supabase (first sync or backup). */
@@ -78,6 +91,7 @@ export async function syncToCloud(userId: string, data: AppData): Promise<void> 
     pet_name: data.pet.name,
     pet_breed: data.pet.breed ?? null,
     pet_photo_url: petPhotoUrl ?? null,
+    onboarding_complete: isOnboardingLocal(userId),
     updated_at: new Date().toISOString(),
   })
   if (profileErr) throw profileErr
@@ -87,7 +101,7 @@ export async function syncToCloud(userId: string, data: AppData): Promise<void> 
   }
 }
 
-export async function pushPet(userId: string, pet: Pet): Promise<void> {
+export async function pushPet(userId: string, pet: Pet, onboardingComplete?: boolean): Promise<void> {
   if (!supabase) return
 
   let petPhotoUrl = pet.photo
@@ -100,9 +114,29 @@ export async function pushPet(userId: string, pet: Pet): Promise<void> {
     pet_name: pet.name,
     pet_breed: pet.breed ?? null,
     pet_photo_url: petPhotoUrl ?? null,
+    onboarding_complete: onboardingComplete ?? isOnboardingLocal(userId),
     updated_at: new Date().toISOString(),
   })
   if (error) throw error
+}
+
+export async function completeOnboarding(userId: string, pet: Pet): Promise<void> {
+  markOnboardingLocal(userId)
+  await pushPet(userId, pet, true)
+}
+
+export async function fetchOnboardingComplete(userId: string): Promise<boolean> {
+  if (isOnboardingLocal(userId)) return true
+  if (!supabase) return false
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('onboarding_complete')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (error || !data) return false
+  return data.onboarding_complete === true
 }
 
 export async function pushEntry(userId: string, entry: DailyEntry): Promise<void> {

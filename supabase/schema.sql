@@ -6,8 +6,13 @@ create table if not exists public.profiles (
   pet_name text not null default 'Woody',
   pet_breed text,
   pet_photo_url text,
+  onboarding_complete boolean not null default false,
   updated_at timestamptz not null default now()
 );
+
+-- If table already exists, run this migration:
+-- alter table public.profiles add column if not exists onboarding_complete boolean not null default false;
+-- update public.profiles set onboarding_complete = true;
 
 -- Daily journal entries
 create table if not exists public.daily_entries (
