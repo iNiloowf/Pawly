@@ -161,24 +161,30 @@ export async function fetchOnboardingComplete(userId: string): Promise<boolean> 
 export async function pushEntry(userId: string, entry: DailyEntry): Promise<void> {
   if (!supabase) return
 
+  const { data: existing } = await supabase
+    .from('daily_entries')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('entry_date', entry.date)
+    .maybeSingle()
+
+  if (existing) return
+
   let photoUrl = entry.photo
   if (entry.photo?.startsWith('data:')) {
     photoUrl = await uploadPhoto(userId, `entries/${entry.date}.jpg`, entry.photo)
   }
 
-  const { error } = await supabase.from('daily_entries').upsert(
-    {
-      user_id: userId,
-      entry_date: entry.date,
-      sleep: entry.sleep,
-      food: entry.food,
-      activity: entry.activity,
-      mood: entry.mood,
-      photo_url: photoUrl ?? null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'user_id,entry_date' },
-  )
+  const { error } = await supabase.from('daily_entries').insert({
+    user_id: userId,
+    entry_date: entry.date,
+    sleep: entry.sleep,
+    food: entry.food,
+    activity: entry.activity,
+    mood: entry.mood,
+    photo_url: photoUrl ?? null,
+    updated_at: new Date().toISOString(),
+  })
   if (error) throw error
 }
 

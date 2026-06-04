@@ -1,13 +1,11 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Check, X } from 'lucide-react'
+import { Camera, Check } from 'lucide-react'
 import PetCard from '../components/PetCard'
 import SelectionCard from '../components/SelectionCard'
+import TodayComplete from '../components/TodayComplete'
 import { useAppData } from '../hooks/useAppData'
-import {
-  saveEntry,
-  compressImage,
-} from '../store/storage'
+import { saveEntry, compressImage } from '../store/storage'
 import {
   SLEEP_OPTIONS,
   FOOD_OPTIONS,
@@ -24,52 +22,50 @@ import {
 
 export default function HomePage() {
   const { pet, entries } = useAppData()
-  const existing = useMemo(
-    () => entries.find((e) => e.date === todayKey()),
-    [entries],
-  )
+  const today = todayKey()
+  const existing = useMemo(() => entries.find((e) => e.date === today), [entries, today])
 
-  const [sleep, setSleep] = useState<SleepLevel>(existing?.sleep ?? DEFAULT_ENTRY.sleep)
-  const [food, setFood] = useState<FoodLevel>(existing?.food ?? DEFAULT_ENTRY.food)
-  const [activity, setActivity] = useState<ActivityLevel>(existing?.activity ?? DEFAULT_ENTRY.activity)
-  const [mood, setMood] = useState<MoodLevel>(existing?.mood ?? DEFAULT_ENTRY.mood)
-  const [photo, setPhoto] = useState<string | undefined>(existing?.photo)
+  const [sleep, setSleep] = useState<SleepLevel>(DEFAULT_ENTRY.sleep)
+  const [food, setFood] = useState<FoodLevel>(DEFAULT_ENTRY.food)
+  const [activity, setActivity] = useState<ActivityLevel>(DEFAULT_ENTRY.activity)
+  const [mood, setMood] = useState<MoodLevel>(DEFAULT_ENTRY.mood)
+  const [photo, setPhoto] = useState<string | undefined>()
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (existing) {
-      setSleep(existing.sleep)
-      setFood(existing.food)
-      setActivity(existing.activity)
-      setMood(existing.mood)
-      setPhoto(existing.photo)
-    }
-  }, [existing?.date])
+  if (existing) {
+    return <TodayComplete pet={pet} entry={existing} />
+  }
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    const dataUrl = await compressImage(file)
-    setPhoto(dataUrl)
+    setPhoto(await compressImage(file))
   }
 
   const handleSave = async () => {
+    setError(null)
     setSaving(true)
     const entry: DailyEntry = {
-      date: todayKey(),
+      date: today,
       sleep,
       food,
       activity,
       mood,
       photo,
     }
-    saveEntry(entry)
-    await new Promise((r) => setTimeout(r, 400))
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    try {
+      saveEntry(entry)
+      await new Promise((r) => setTimeout(r, 400))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -103,13 +99,6 @@ export default function HomePage() {
           className="relative mb-4 rounded-[var(--radius-card)] overflow-hidden aspect-[4/3] shadow-[var(--shadow-card)]"
         >
           <img src={photo} alt="Today's photo" className="w-full h-full object-cover" />
-          <button
-            type="button"
-            onClick={() => setPhoto(undefined)}
-            className="absolute top-3 right-3 w-8 h-8 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center text-white"
-          >
-            <X size={16} />
-          </button>
         </motion.div>
       ) : (
         <motion.button
@@ -123,11 +112,15 @@ export default function HomePage() {
         </motion.button>
       )}
 
+      {error && (
+        <p className="text-sm text-[var(--color-danger)] text-center mb-3">{error}</p>
+      )}
+
       <motion.button
         type="button"
         whileTap={{ scale: 0.97 }}
         onClick={handleSave}
-        disabled={saving}
+        disabled={saving || saved}
         className="w-full py-4 bg-[var(--color-primary)] text-white font-semibold rounded-[var(--radius-button)] shadow-lg shadow-[rgba(124,92,255,0.35)] flex items-center justify-center gap-2 disabled:opacity-70"
       >
         <AnimatePresence mode="wait">
@@ -153,11 +146,9 @@ export default function HomePage() {
         </AnimatePresence>
       </motion.button>
 
-      {existing && (
-        <p className="text-center text-xs text-[var(--color-muted)] mt-3">
-          You already checked in today — saving will update your entry.
-        </p>
-      )}
+      <p className="text-center text-xs text-[var(--color-muted)] mt-3">
+        One check-in per day — make sure everything looks good before saving.
+      </p>
     </div>
   )
 }

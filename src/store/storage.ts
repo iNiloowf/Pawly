@@ -74,10 +74,10 @@ export function getTodayEntry(): DailyEntry | undefined {
 
 export function saveEntry(entry: DailyEntry): DailyEntry {
   const idx = cache.entries.findIndex((e) => e.date === entry.date)
-  const entries =
-    idx >= 0
-      ? cache.entries.map((e, i) => (i === idx ? entry : e))
-      : [...cache.entries, entry]
+  if (idx >= 0) {
+    return cache.entries[idx]
+  }
+  const entries = [...cache.entries, entry]
   cache = { ...cache, entries }
   saveRaw(cache)
   notify()
@@ -85,6 +85,10 @@ export function saveEntry(entry: DailyEntry): DailyEntry {
     pushEntry(syncUserId, entry).catch(console.error)
   }
   return entry
+}
+
+export function hasEntryForDate(date: string): boolean {
+  return cache.entries.some((e) => e.date === date)
 }
 
 export function getEntriesWithPhotos(): DailyEntry[] {
