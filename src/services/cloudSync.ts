@@ -180,6 +180,8 @@ export async function pushEntry(userId: string, entry: DailyEntry): Promise<void
     { onConflict: 'user_id,entry_date' },
   )
   if (error) throw error
+
+  // Never wipe local photo — cloud may lack bucket; local/IDB keeps base64
 }
 
 export function canUseCloud(): boolean {

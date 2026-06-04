@@ -1,19 +1,24 @@
 import type { AppData, DailyEntry, Pet } from '../types'
 import { DEFAULT_PET, todayKey } from '../types'
 import { canUseCloud, pushEntry, pushPet } from '../services/cloudSync'
+import { entryPhotoKey, hydrateEntryPhotos, loadPhotoRef, savePhotoRef } from './photoStore'
 
 const STORAGE_KEY = 'pawly-data'
 
 let syncUserId: string | null = null
+let snapshotVersion = 0
 
 export function setSyncUserId(userId: string | null): void {
   syncUserId = userId
 }
 
+export function getSnapshotVersion(): number {
+  return snapshotVersion
+}
+
 export function replaceData(data: AppData): void {
   cache = data
-  saveRaw(cache)
-  notify()
+  persistCache()
 }
 
 function loadRaw(): AppData {
@@ -26,14 +31,57 @@ function loadRaw(): AppData {
   return { pet: { ...DEFAULT_PET }, entries: [] }
 }
 
-function saveRaw(data: AppData): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+/** Strip base64 photos from data before localStorage (stored in IndexedDB). */
+function stripPhotosForStorage(data: AppData): AppData {
+  return {
+    pet: {
+      ...data.pet,
+      photo: data.pet.photo?.startsWith('data:') ? undefined : data.pet.photo,
+    },
+    entries: data.entries.map((e) => ({
+      ...e,
+      photo: e.photo?.startsWith('data:') ? undefined : e.photo,
+    })),
+  }
+}
+
+function persistCache(): void {
+  notify()
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripPhotosForStorage(cache)))
+  } catch (err) {
+    console.warn('[Pawly] localStorage save failed — photos kept in IndexedDB', err)
+  }
+  for (const entry of cache.entries) {
+    if (entry.photo?.startsWith('data:')) {
+      savePhotoRef(entryPhotoKey(entry.date), entry.photo).catch(console.error)
+    }
+  }
+  if (cache.pet.photo?.startsWith('data:')) {
+    savePhotoRef('pet-profile', cache.pet.photo).catch(console.error)
+  }
 }
 
 let cache: AppData = loadRaw()
+let hydrated = false
+
+export async function hydratePhotosFromIdb(): Promise<void> {
+  if (hydrated) return
+  hydrated = true
+  const entries = await hydrateEntryPhotos(cache.entries)
+  let pet = cache.pet
+  if (!pet.photo) {
+    const petPhoto = await loadPhotoRef('pet-profile')
+    if (petPhoto) pet = { ...pet, photo: petPhoto }
+  }
+  cache = { ...cache, entries, pet }
+  notify()
+}
+
 const listeners = new Set<() => void>()
 
 function notify(): void {
+  snapshotVersion++
   listeners.forEach((fn) => fn())
 }
 
@@ -52,8 +100,7 @@ export function getPet(): Pet {
 
 export function updatePet(pet: Partial<Pet>): Pet {
   cache = { ...cache, pet: { ...cache.pet, ...pet } }
-  saveRaw(cache)
-  notify()
+  persistCache()
   if (syncUserId && canUseCloud()) {
     pushPet(syncUserId, cache.pet).catch(console.error)
   }
@@ -79,8 +126,7 @@ export function saveEntry(entry: DailyEntry): DailyEntry {
       ? cache.entries.map((e, i) => (i === idx ? entry : e))
       : [...cache.entries, entry]
   cache = { ...cache, entries }
-  saveRaw(cache)
-  notify()
+  persistCache()
   if (syncUserId && canUseCloud()) {
     pushEntry(syncUserId, entry).catch(console.error)
   }
@@ -112,16 +158,7 @@ export function levelScore(level: 'low' | 'normal' | 'high' | 'poor' | 'okay' | 
   return map[level] ?? 2
 }
 
-export async function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
-export function compressImage(file: File, maxSize = 800): Promise<string> {
+export function compressImage(file: File, maxSize = 600): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     const url = URL.createObjectURL(file)
@@ -142,7 +179,7 @@ export function compressImage(file: File, maxSize = 800): Promise<string> {
         return
       }
       ctx.drawImage(img, 0, 0, width, height)
-      resolve(canvas.toDataURL('image/jpeg', 0.85))
+      resolve(canvas.toDataURL('image/jpeg', 0.8))
     }
     img.onerror = reject
     img.src = url

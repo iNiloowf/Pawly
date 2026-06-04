@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Camera, Check, X, ArrowLeft } from 'lucide-react'
 import PetCard from '../components/PetCard'
@@ -36,19 +36,21 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => {
-    if (existing && isEditing) {
-      setSleep(existing.sleep)
-      setFood(existing.food)
-      setActivity(existing.activity)
-      setMood(existing.mood)
-      setPhoto(existing.photo)
-    }
-  }, [existing, isEditing])
+  const loadFormFromEntry = (entry: DailyEntry) => {
+    setSleep(entry.sleep)
+    setFood(entry.food)
+    setActivity(entry.activity)
+    setMood(entry.mood)
+    setPhoto(entry.photo)
+  }
 
-  const startEdit = () => setIsEditing(true)
+  const startEdit = () => {
+    if (existing) loadFormFromEntry(existing)
+    setIsEditing(true)
+  }
 
   const startAddPhoto = () => {
+    if (existing) loadFormFromEntry(existing)
     setIsEditing(true)
     setTimeout(() => fileRef.current?.click(), 100)
   }
@@ -67,7 +69,20 @@ export default function HomePage() {
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setPhoto(await compressImage(file))
+    e.target.value = ''
+    const compressed = await compressImage(file)
+    setPhoto(compressed)
+
+    const entry: DailyEntry = {
+      date: today,
+      sleep: existing?.sleep ?? sleep,
+      food: existing?.food ?? food,
+      activity: existing?.activity ?? activity,
+      mood: existing?.mood ?? mood,
+      photo: compressed,
+    }
+    saveEntry(entry)
+    if (existing) setIsEditing(false)
   }
 
   const handleSave = async () => {

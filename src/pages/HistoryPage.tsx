@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday } from 'date-fns'
 import { useAppData } from '../hooks/useAppData'
-import { getEntries } from '../store/storage'
 import { moodEmoji, sleepLabel, foodLabel, activityLabel, moodLabel } from '../types'
 
 export default function HistoryPage() {
-  const data = useAppData()
-  const entries = useMemo(() => getEntries(), [data.entries])
+  const { entries: rawEntries, _v } = useAppData()
+  const entries = useMemo(
+    () => [...rawEntries].sort((a, b) => b.date.localeCompare(a.date)),
+    [rawEntries, _v],
+  )
   const entryMap = useMemo(() => new Map(entries.map((e) => [e.date, e])), [entries])
 
   const now = new Date()

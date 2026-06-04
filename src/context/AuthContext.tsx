@@ -9,7 +9,7 @@ import {
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { getData, replaceData, setSyncUserId, updatePet } from '../store/storage'
+import { getData, replaceData, setSyncUserId, updatePet, hydratePhotosFromIdb } from '../store/storage'
 import type { Pet } from '../types'
 import type { DailyEntry } from '../types'
 import {
@@ -74,7 +74,7 @@ function mergeEntries(local: DailyEntry[], cloud: DailyEntry[]): DailyEntry[] {
     } else {
       map.set(e.date, {
         ...existing,
-        photo: existing.photo || e.photo,
+        photo: e.photo || existing.photo,
       })
     }
   }
@@ -144,6 +144,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setSyncing(false)
     }
+  }, [])
+
+  useEffect(() => {
+    hydratePhotosFromIdb()
   }, [])
 
   useEffect(() => {

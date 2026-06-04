@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useAppData } from '../hooks/useAppData'
-import { getEntriesWithPhotos } from '../store/storage'
 import {
   moodEmoji,
   sleepLabel,
@@ -25,8 +24,14 @@ const GRID_PATTERNS = [
 ]
 
 export default function GalleryPage() {
-  const data = useAppData()
-  const photos = useMemo(() => getEntriesWithPhotos(), [data.entries])
+  const { entries: rawEntries, _v } = useAppData()
+  const photos = useMemo(
+    () =>
+      [...rawEntries]
+        .filter((e) => Boolean(e.photo))
+        .sort((a, b) => b.date.localeCompare(a.date)),
+    [rawEntries, _v],
+  )
   const [selected, setSelected] = useState<DailyEntry | null>(null)
 
   return (
