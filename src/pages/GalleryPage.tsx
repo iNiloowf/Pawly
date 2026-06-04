@@ -35,7 +35,7 @@ export default function GalleryPage() {
   const [selected, setSelected] = useState<DailyEntry | null>(null)
 
   return (
-    <div className="px-5 pt-12 pb-28">
+    <div className="px-5 pt-12 page-with-nav">
       <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">Memories</h1>
       <p className="text-sm text-[var(--color-text-secondary)] mb-6">
         {photos.length} photo{photos.length !== 1 ? 's' : ''} captured
