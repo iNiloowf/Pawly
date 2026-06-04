@@ -22,7 +22,7 @@ type AuthContextValue = {
   cloudEnabled: boolean
   syncing: boolean
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string) => Promise<{ needsEmailConfirmation: boolean }>
   signOut: () => Promise<void>
   continueAsGuest: () => void
   refreshCloud: () => Promise<void>
@@ -107,7 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setGuestMode(false)
     setIsGuest(false)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    if (error) {
+      if (error.message.toLowerCase().includes('email not confirmed')) {
+        throw new Error('Email not confirmed yet. Check your inbox and spam folder, or ask the admin to confirm your account.')
+      }
+      throw error
+    }
   }, [])
 
   const signUp = useCallback(async (email: string, password: string) => {
@@ -116,7 +121,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsGuest(false)
     const { data, error } = await supabase.auth.signUp({ email, password })
     if (error) throw error
-    if (data.user && cloudEnabled) {
+
+    const needsEmailConfirmation = !data.session
+
+    if (data.user && data.session && cloudEnabled) {
       const local = getData()
       if (local.entries.length > 0 || local.pet.photo) {
         setSyncing(true)
@@ -127,6 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     }
+
+    return { needsEmailConfirmation }
   }, [cloudEnabled])
 
   const signOut = useCallback(async () => {

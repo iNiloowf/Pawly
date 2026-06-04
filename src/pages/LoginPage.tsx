@@ -11,17 +11,25 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setSuccess(null)
     setLoading(true)
     try {
-      if (mode === 'signin') await signIn(email.trim(), password)
-      else await signUp(email.trim(), password)
-      if (mode === 'signup') {
-        setError(null)
-        // Supabase may require email confirm
+      if (mode === 'signin') {
+        await signIn(email.trim(), password)
+      } else {
+        const { needsEmailConfirmation } = await signUp(email.trim(), password)
+        if (needsEmailConfirmation) {
+          setSuccess('Account created! Check your email (and spam folder) to confirm, then sign in.')
+          setMode('signin')
+        } else {
+          setSuccess('Account created! You can sign in now.')
+          setMode('signin')
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -81,7 +89,7 @@ export default function LoginPage() {
               <button
                 key={m}
                 type="button"
-                onClick={() => { setMode(m); setError(null) }}
+                onClick={() => { setMode(m); setError(null); setSuccess(null) }}
                 className={`flex-1 py-2.5 text-sm font-semibold rounded-full transition-all ${
                   mode === m
                     ? 'bg-[var(--color-primary)] text-white shadow-md'
@@ -119,6 +127,16 @@ export default function LoginPage() {
           </Field>
 
           <AnimatePresence>
+            {success && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0 }}
+                className="text-sm text-[var(--color-success)] text-center leading-relaxed"
+              >
+                {success}
+              </motion.p>
+            )}
             {error && (
               <motion.p
                 initial={{ opacity: 0, height: 0 }}
