@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mail, Lock, Loader2, Cloud, Smartphone } from 'lucide-react'
+import { Mail, Lock, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { isSupabaseConfigured } from '../lib/supabase'
 
@@ -136,36 +136,8 @@ export default function LoginPage() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="mt-8 space-y-4"
+        className="mt-8"
       >
-        <div className="bg-white/80 rounded-2xl p-4 border border-[var(--color-border)]">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-soft)] flex items-center justify-center shrink-0">
-              <Cloud size={20} className="text-[var(--color-primary)]" />
-            </div>
-            <div>
-              <p className="font-semibold text-sm text-[var(--color-text)]">Where is data restored?</p>
-              <p className="text-xs text-[var(--color-text-secondary)] mt-1 leading-relaxed">
-                After sign-in, your pet profile, daily check-ins, and photos load from <strong>Supabase Cloud</strong> — database for journal data and storage bucket for images. Same account on any device.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white/80 rounded-2xl p-4 border border-[var(--color-border)]">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[var(--color-surface)] flex items-center justify-center shrink-0">
-              <Smartphone size={20} className="text-[var(--color-muted)]" />
-            </div>
-            <div>
-              <p className="font-semibold text-sm text-[var(--color-text)]">Without account</p>
-              <p className="text-xs text-[var(--color-text-secondary)] mt-1 leading-relaxed">
-                Data stays only on this browser (<code className="text-[10px]">localStorage</code>). Clearing cache or switching devices loses it.
-              </p>
-            </div>
-          </div>
-        </div>
-
         <button
           type="button"
           onClick={continueAsGuest}
