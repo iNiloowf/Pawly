@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Camera, Check } from 'lucide-react'
+import { Camera, Check, X, ArrowLeft } from 'lucide-react'
 import PetCard from '../components/PetCard'
 import SelectionCard from '../components/SelectionCard'
 import TodayComplete from '../components/TodayComplete'
@@ -25,6 +25,7 @@ export default function HomePage() {
   const today = todayKey()
   const existing = useMemo(() => entries.find((e) => e.date === today), [entries, today])
 
+  const [isEditing, setIsEditing] = useState(false)
   const [sleep, setSleep] = useState<SleepLevel>(DEFAULT_ENTRY.sleep)
   const [food, setFood] = useState<FoodLevel>(DEFAULT_ENTRY.food)
   const [activity, setActivity] = useState<ActivityLevel>(DEFAULT_ENTRY.activity)
@@ -35,8 +36,32 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  if (existing) {
-    return <TodayComplete pet={pet} entry={existing} />
+  useEffect(() => {
+    if (existing && isEditing) {
+      setSleep(existing.sleep)
+      setFood(existing.food)
+      setActivity(existing.activity)
+      setMood(existing.mood)
+      setPhoto(existing.photo)
+    }
+  }, [existing, isEditing])
+
+  const startEdit = () => setIsEditing(true)
+
+  const startAddPhoto = () => {
+    setIsEditing(true)
+    setTimeout(() => fileRef.current?.click(), 100)
+  }
+
+  if (existing && !isEditing) {
+    return (
+      <TodayComplete
+        pet={pet}
+        entry={existing}
+        onEdit={startEdit}
+        onAddPhoto={startAddPhoto}
+      />
+    )
   }
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,7 +85,8 @@ export default function HomePage() {
       saveEntry(entry)
       await new Promise((r) => setTimeout(r, 400))
       setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
+      setIsEditing(false)
+      setTimeout(() => setSaved(false), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save')
     } finally {
@@ -68,8 +94,20 @@ export default function HomePage() {
     }
   }
 
+  const isUpdate = Boolean(existing)
+
   return (
     <div className="px-5 pt-12 pb-4">
+      {isUpdate && (
+        <button
+          type="button"
+          onClick={() => setIsEditing(false)}
+          className="inline-flex items-center gap-1 text-[var(--color-primary)] font-medium mb-4"
+        >
+          <ArrowLeft size={18} /> Back
+        </button>
+      )}
+
       <div className="mb-6">
         <p className="text-sm font-medium text-[var(--color-primary)] mb-1">Good {getGreeting()} 👋</p>
         <PetCard pet={pet} />
@@ -80,7 +118,7 @@ export default function HomePage() {
         animate={{ opacity: 1 }}
         className="text-xl font-bold text-[var(--color-text)] mb-4"
       >
-        How is {pet.name} today?
+        {isUpdate ? `Update ${pet.name}'s check-in` : `How is ${pet.name} today?`}
       </motion.h2>
 
       <div className="space-y-3 mb-6">
@@ -99,6 +137,13 @@ export default function HomePage() {
           className="relative mb-4 rounded-[var(--radius-card)] overflow-hidden aspect-[4/3] shadow-[var(--shadow-card)]"
         >
           <img src={photo} alt="Today's photo" className="w-full h-full object-cover" />
+          <button
+            type="button"
+            onClick={() => setPhoto(undefined)}
+            className="absolute top-3 right-3 w-8 h-8 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center text-white"
+          >
+            <X size={16} />
+          </button>
         </motion.div>
       ) : (
         <motion.button
@@ -120,7 +165,7 @@ export default function HomePage() {
         type="button"
         whileTap={{ scale: 0.97 }}
         onClick={handleSave}
-        disabled={saving || saved}
+        disabled={saving}
         className="w-full py-4 bg-[var(--color-primary)] text-white font-semibold rounded-[var(--radius-button)] shadow-lg shadow-[rgba(124,92,255,0.35)] flex items-center justify-center gap-2 disabled:opacity-70"
       >
         <AnimatePresence mode="wait">
@@ -140,14 +185,14 @@ export default function HomePage() {
             </motion.span>
           ) : (
             <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              Save Today
+              {isUpdate ? 'Update Today' : 'Save Today'}
             </motion.span>
           )}
         </AnimatePresence>
       </motion.button>
 
       <p className="text-center text-xs text-[var(--color-muted)] mt-3">
-        One check-in per day — make sure everything looks good before saving.
+        One entry per day — you can edit or add a photo anytime today.
       </p>
     </div>
   )
