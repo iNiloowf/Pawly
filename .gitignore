@@ -4,7 +4,9 @@ node_modules
 # build
 dist
 dist-ssr
-*.local
+.env
+.env.local
+.env.*.local
 *.tsbuildinfo
 
 # editor

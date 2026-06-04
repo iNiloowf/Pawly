@@ -20,6 +20,21 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) on your phone or desktop. The UI is optimized for mobile (max 430px width).
 
+## Login & cloud sync
+
+| Mode | Where data lives | Restore |
+|------|------------------|---------|
+| **Signed in** | Supabase (PostgreSQL + Storage bucket `photos`) | Automatic on sign-in |
+| **Guest** | Browser `localStorage` only | This device only |
+
+### Supabase setup (one-time)
+
+1. Create a free project at [supabase.com](https://supabase.com)
+2. Run `supabase/schema.sql` in **SQL Editor**
+3. Create Storage bucket **`photos`** (public)
+4. Copy `.env.example` → `.env.local` and add your URL + anon key
+5. Restart `npm run dev`
+
 ## Tech stack
 
 - React 19 + TypeScript
@@ -27,7 +42,8 @@ Open [http://localhost:5173](http://localhost:5173) on your phone or desktop. Th
 - Tailwind CSS 4
 - Framer Motion
 - React Router
-- localStorage (no backend)
+- Supabase Auth + DB + Storage
+- localStorage cache (offline-friendly)
 
 ## Screens
 

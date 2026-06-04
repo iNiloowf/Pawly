@@ -1,0 +1,134 @@
+import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import type { AppData, DailyEntry, Pet } from '../types'
+import { DEFAULT_PET } from '../types'
+
+const BUCKET = 'photos'
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const [header, base64] = dataUrl.split(',')
+  const mime = header.match(/:(.*?);/)?.[1] ?? 'image/jpeg'
+  const bytes = atob(base64)
+  const arr = new Uint8Array(bytes.length)
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+  return new Blob([arr], { type: mime })
+}
+
+async function uploadPhoto(userId: string, path: string, dataUrl: string): Promise<string | undefined> {
+  if (!supabase || !dataUrl.startsWith('data:')) return dataUrl.startsWith('http') ? dataUrl : undefined
+  const blob = dataUrlToBlob(dataUrl)
+  const filePath = `${userId}/${path}`
+  const { error } = await supabase.storage.from(BUCKET).upload(filePath, blob, {
+    upsert: true,
+    contentType: blob.type,
+  })
+  if (error) throw error
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
+  return data.publicUrl
+}
+
+/** Pull pet + entries + photo URLs from Supabase (cloud restore). */
+export async function restoreFromCloud(userId: string): Promise<AppData> {
+  if (!supabase) throw new Error('Supabase not configured')
+
+  const { data: profile, error: profileErr } = await supabase
+    .from('profiles')
+    .select('pet_name, pet_breed, pet_photo_url')
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (profileErr) throw profileErr
+
+  const { data: rows, error: entriesErr } = await supabase
+    .from('daily_entries')
+    .select('entry_date, sleep, food, activity, mood, photo_url')
+    .eq('user_id', userId)
+    .order('entry_date', { ascending: false })
+
+  if (entriesErr) throw entriesErr
+
+  const pet: Pet = {
+    name: profile?.pet_name ?? DEFAULT_PET.name,
+    breed: profile?.pet_breed ?? undefined,
+    photo: profile?.pet_photo_url ?? undefined,
+  }
+
+  const entries: DailyEntry[] = (rows ?? []).map((r) => ({
+    date: r.entry_date as string,
+    sleep: r.sleep as DailyEntry['sleep'],
+    food: r.food as DailyEntry['food'],
+    activity: r.activity as DailyEntry['activity'],
+    mood: r.mood as DailyEntry['mood'],
+    photo: r.photo_url ?? undefined,
+  }))
+
+  return { pet, entries }
+}
+
+/** Push all local data to Supabase (first sync or backup). */
+export async function syncToCloud(userId: string, data: AppData): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured')
+
+  let petPhotoUrl = data.pet.photo
+  if (data.pet.photo?.startsWith('data:')) {
+    petPhotoUrl = await uploadPhoto(userId, 'pet.jpg', data.pet.photo)
+  }
+
+  const { error: profileErr } = await supabase.from('profiles').upsert({
+    id: userId,
+    pet_name: data.pet.name,
+    pet_breed: data.pet.breed ?? null,
+    pet_photo_url: petPhotoUrl ?? null,
+    updated_at: new Date().toISOString(),
+  })
+  if (profileErr) throw profileErr
+
+  for (const entry of data.entries) {
+    await pushEntry(userId, entry)
+  }
+}
+
+export async function pushPet(userId: string, pet: Pet): Promise<void> {
+  if (!supabase) return
+
+  let petPhotoUrl = pet.photo
+  if (pet.photo?.startsWith('data:')) {
+    petPhotoUrl = await uploadPhoto(userId, 'pet.jpg', pet.photo)
+  }
+
+  const { error } = await supabase.from('profiles').upsert({
+    id: userId,
+    pet_name: pet.name,
+    pet_breed: pet.breed ?? null,
+    pet_photo_url: petPhotoUrl ?? null,
+    updated_at: new Date().toISOString(),
+  })
+  if (error) throw error
+}
+
+export async function pushEntry(userId: string, entry: DailyEntry): Promise<void> {
+  if (!supabase) return
+
+  let photoUrl = entry.photo
+  if (entry.photo?.startsWith('data:')) {
+    photoUrl = await uploadPhoto(userId, `entries/${entry.date}.jpg`, entry.photo)
+  }
+
+  const { error } = await supabase.from('daily_entries').upsert(
+    {
+      user_id: userId,
+      entry_date: entry.date,
+      sleep: entry.sleep,
+      food: entry.food,
+      activity: entry.activity,
+      mood: entry.mood,
+      photo_url: photoUrl ?? null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,entry_date' },
+  )
+  if (error) throw error
+}
+
+export function canUseCloud(): boolean {
+  return isSupabaseConfigured && supabase !== null
+}

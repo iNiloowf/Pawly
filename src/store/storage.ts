@@ -1,7 +1,20 @@
 import type { AppData, DailyEntry, Pet } from '../types'
 import { DEFAULT_PET, todayKey } from '../types'
+import { canUseCloud, pushEntry, pushPet } from '../services/cloudSync'
 
 const STORAGE_KEY = 'pawly-data'
+
+let syncUserId: string | null = null
+
+export function setSyncUserId(userId: string | null): void {
+  syncUserId = userId
+}
+
+export function replaceData(data: AppData): void {
+  cache = data
+  saveRaw(cache)
+  notify()
+}
 
 function loadRaw(): AppData {
   try {
@@ -41,6 +54,9 @@ export function updatePet(pet: Partial<Pet>): Pet {
   cache = { ...cache, pet: { ...cache.pet, ...pet } }
   saveRaw(cache)
   notify()
+  if (syncUserId && canUseCloud()) {
+    pushPet(syncUserId, cache.pet).catch(console.error)
+  }
   return cache.pet
 }
 
@@ -65,6 +81,9 @@ export function saveEntry(entry: DailyEntry): DailyEntry {
   }
   saveRaw(cache)
   notify()
+  if (syncUserId && canUseCloud()) {
+    pushEntry(syncUserId, entry).catch(console.error)
+  }
   return entry
 }
 
