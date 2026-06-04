@@ -97,6 +97,21 @@ async function mergeOnLogin(userId: string): Promise<boolean> {
   return cloud.onboardingComplete
 }
 
+async function resolveSession(): Promise<Session | null> {
+  if (!supabase) return null
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
+
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) {
+    await supabase.auth.signOut()
+    return null
+  }
+
+  return session
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
@@ -121,28 +136,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSyncUserId(session?.user?.id ?? null)
   }, [session?.user?.id])
 
+  const signOut = useCallback(async () => {
+    const userId = session?.user?.id
+    if (supabase) await supabase.auth.signOut()
+    if (userId) localStorage.removeItem(`pawly-onboarded-${userId}`)
+    setSession(null)
+    setGuestMode(false)
+    setIsGuest(false)
+    setAuthGate(false)
+    setAuthGatePassed(false)
+    setOnboardingComplete(true)
+  }, [session?.user?.id])
+
   useEffect(() => {
     if (!supabase) {
       setLoading(false)
       return
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      if (data.session?.user && cloudEnabled && getAuthGate()) {
-        runSync(data.session.user.id).finally(() => setLoading(false))
+    resolveSession().then((validSession) => {
+      setSession(validSession)
+      if (validSession?.user && cloudEnabled && getAuthGate()) {
+        runSync(validSession.user.id).finally(() => setLoading(false))
       } else {
         setOnboardingComplete(true)
         setLoading(false)
       }
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-      if (nextSession?.user && cloudEnabled && getAuthGate()) {
-        runSync(nextSession.user.id)
-      } else if (!nextSession?.user) {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+      if (event === 'SIGNED_OUT' || !nextSession) {
+        setSession(null)
         setOnboardingComplete(true)
+        return
+      }
+
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (error || !user) {
+        await supabase.auth.signOut()
+        setSession(null)
+        setOnboardingComplete(true)
+        return
+      }
+
+      setSession(nextSession)
+      if (cloudEnabled && getAuthGate()) {
+        runSync(nextSession.user.id)
       }
     })
 
@@ -189,24 +228,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [cloudEnabled])
 
   const passAuthGate = useCallback(async () => {
+    if (!supabase) throw new Error('Cloud login is not configured')
+
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (error || !user) {
+      await signOut()
+      throw new Error('Session expired. Please sign in or create a new account.')
+    }
+
     setAuthGate(true)
     setAuthGatePassed(true)
     setGuestMode(false)
     setIsGuest(false)
-    if (session?.user && cloudEnabled) {
-      await runSync(session.user.id)
+    if (cloudEnabled) {
+      await runSync(user.id)
     }
-  }, [session, cloudEnabled, runSync])
-
-  const signOut = useCallback(async () => {
-    if (supabase) await supabase.auth.signOut()
-    setSession(null)
-    setGuestMode(false)
-    setIsGuest(false)
-    setAuthGate(false)
-    setAuthGatePassed(false)
-    setOnboardingComplete(true)
-  }, [])
+  }, [cloudEnabled, runSync, signOut])
 
   const continueAsGuest = useCallback(() => {
     setGuestMode(true)
