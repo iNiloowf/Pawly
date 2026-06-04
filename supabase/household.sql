@@ -71,15 +71,27 @@ as $$
   );
 $$;
 
+create or replace function public.is_household_member(hid uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.household_members
+    where household_id = hid
+      and user_id = auth.uid()
+  );
+$$;
+
 -- Households
+drop policy if exists "Members read own household" on public.households;
+
 create policy "Members read own household"
   on public.households for select
-  using (
-    exists (
-      select 1 from public.household_members hm
-      where hm.household_id = households.id and hm.user_id = auth.uid()
-    )
-  );
+  using (public.is_household_member(id));
 
 create policy "Users create own household"
   on public.households for insert
@@ -90,14 +102,7 @@ drop policy if exists "Members read household roster" on public.household_member
 
 create policy "Members read household roster"
   on public.household_members for select
-  using (
-    user_id = auth.uid()
-    or exists (
-      select 1 from public.household_members me
-      where me.household_id = household_members.household_id
-        and me.user_id = auth.uid()
-    )
-  );
+  using (public.is_household_member(household_id));
 
 create policy "Users join via invite or create as owner"
   on public.household_members for insert

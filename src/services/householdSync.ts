@@ -31,6 +31,9 @@ function formatSupabaseError(err: unknown): string {
   if (e.code === '42501' || msg.toLowerCase().includes('permission denied')) {
     return 'Permission denied. Re-run supabase/household.sql to fix database policies.'
   }
+  if (msg.toLowerCase().includes('infinite recursion')) {
+    return 'Database policy error. Run supabase/household-fix.sql in Supabase SQL Editor.'
+  }
 
   return e.details ? `${msg} (${e.details})` : msg
 }
