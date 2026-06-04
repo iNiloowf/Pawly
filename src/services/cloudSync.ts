@@ -13,17 +13,36 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([arr], { type: mime })
 }
 
+function isBucketError(error: { message?: string }): boolean {
+  const msg = (error.message ?? '').toLowerCase()
+  return msg.includes('bucket') || msg.includes('not found')
+}
+
 async function uploadPhoto(userId: string, path: string, dataUrl: string): Promise<string | undefined> {
   if (!supabase || !dataUrl.startsWith('data:')) return dataUrl.startsWith('http') ? dataUrl : undefined
-  const blob = dataUrlToBlob(dataUrl)
-  const filePath = `${userId}/${path}`
-  const { error } = await supabase.storage.from(BUCKET).upload(filePath, blob, {
-    upsert: true,
-    contentType: blob.type,
-  })
-  if (error) throw error
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
-  return data.publicUrl
+  try {
+    const blob = dataUrlToBlob(dataUrl)
+    const filePath = `${userId}/${path}`
+    const { error } = await supabase.storage.from(BUCKET).upload(filePath, blob, {
+      upsert: true,
+      contentType: blob.type,
+    })
+    if (error) {
+      if (isBucketError(error)) {
+        console.warn('[Pawly] Storage bucket "photos" not found — photo kept on device only')
+        return undefined
+      }
+      throw error
+    }
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
+    return data.publicUrl
+  } catch (err) {
+    if (err && typeof err === 'object' && isBucketError(err as { message?: string })) {
+      console.warn('[Pawly] Storage bucket "photos" not found — photo kept on device only')
+      return undefined
+    }
+    throw err
+  }
 }
 
 const ONBOARDING_KEY = (userId: string) => `pawly-onboarded-${userId}`

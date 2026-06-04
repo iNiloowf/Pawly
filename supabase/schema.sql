@@ -41,10 +41,5 @@ create policy "Users manage own entries"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- Storage bucket: create "photos" in Dashboard → Storage (public read, auth write)
--- Policies (run after bucket exists):
--- create policy "Users upload own photos" on storage.objects for insert
---   with check (bucket_id = 'photos' and auth.uid()::text = (storage.foldername(name))[1]);
--- create policy "Users read own photos" on storage.objects for select
---   using (bucket_id = 'photos' and auth.uid()::text = (storage.foldername(name))[1]);
--- create policy "Public read photos" on storage.objects for select using (bucket_id = 'photos');
+-- Storage: run supabase/storage.sql in SQL Editor
+-- Or manually: Dashboard → Storage → New bucket → name "photos" → Public
