@@ -17,6 +17,24 @@ export type HouseholdInfo = {
   }
 }
 
+function formatSupabaseError(err: unknown): string {
+  if (!err || typeof err !== 'object') return 'Unknown error'
+  const e = err as { message?: string; code?: string; details?: string; hint?: string }
+  const msg = e.message ?? 'Request failed'
+
+  if (msg.includes('does not exist') || e.code === '42P01') {
+    return 'Household tables are missing. Run supabase/household.sql in Supabase SQL Editor, then try again.'
+  }
+  if (msg.includes('create_household_invite') || e.code === 'PGRST202') {
+    return 'Invite function missing. Re-run supabase/household.sql in Supabase SQL Editor (full file).'
+  }
+  if (e.code === '42501' || msg.toLowerCase().includes('permission denied')) {
+    return 'Permission denied. Re-run supabase/household.sql to fix database policies.'
+  }
+
+  return e.details ? `${msg} (${e.details})` : msg
+}
+
 export function captureInviteFromUrl(): void {
   const params = new URLSearchParams(window.location.search)
   const invite = params.get('invite')?.trim()
@@ -41,6 +59,11 @@ export function buildInviteLink(token: string): string {
   return `${base}/?invite=${token}`
 }
 
+function randomInviteToken(): string {
+  const part = () => crypto.randomUUID().replace(/-/g, '')
+  return (part() + part()).slice(0, 32)
+}
+
 export async function ensureUserHousehold(userId: string): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured')
 
@@ -50,7 +73,7 @@ export async function ensureUserHousehold(userId: string): Promise<string> {
     .eq('user_id', userId)
     .maybeSingle()
 
-  if (readErr) throw readErr
+  if (readErr) throw new Error(formatSupabaseError(readErr))
   if (existing?.household_id) return existing.household_id
 
   const { data: household, error: createErr } = await supabase
@@ -59,16 +82,21 @@ export async function ensureUserHousehold(userId: string): Promise<string> {
     .select('id')
     .single()
 
-  if (createErr) throw createErr
+  if (createErr) throw new Error(formatSupabaseError(createErr))
 
   const { error: memberErr } = await supabase.from('household_members').insert({
     household_id: household.id,
     user_id: userId,
     role: 'owner',
   })
-  if (memberErr) throw memberErr
+  if (memberErr) throw new Error(formatSupabaseError(memberErr))
 
-  await supabase.from('profiles').update({ household_id: household.id }).eq('id', userId)
+  const { error: profileErr } = await supabase.from('profiles').upsert({
+    id: userId,
+    pet_name: 'Woody',
+    household_id: household.id,
+  })
+  if (profileErr) throw new Error(formatSupabaseError(profileErr))
 
   return household.id
 }
@@ -101,18 +129,35 @@ export async function acceptHouseholdInvite(_userId: string, token: string): Pro
     invite_token: token,
   })
 
-  if (error) throw error
+  if (error) throw new Error(formatSupabaseError(error))
   const ownerId = (data as { owner_id?: string })?.owner_id
   if (!ownerId) throw new Error('Could not join shared account')
   return ownerId
 }
 
-export async function createHouseholdInvite(userId: string): Promise<string> {
+export async function createHouseholdInvite(_userId: string): Promise<string> {
+  if (!supabase) throw new Error('Supabase not configured')
+
+  const { data, error } = await supabase.rpc('create_household_invite')
+
+  if (!error && typeof data === 'string' && data.length > 0) {
+    return data
+  }
+
+  if (error?.code === 'PGRST202') {
+    return createHouseholdInviteFallback(_userId)
+  }
+
+  if (error) throw new Error(formatSupabaseError(error))
+  throw new Error('Could not create invite link')
+}
+
+async function createHouseholdInviteFallback(userId: string): Promise<string> {
   if (!supabase) throw new Error('Supabase not configured')
 
   const householdId = await ensureUserHousehold(userId)
 
-  const { data: existing } = await supabase
+  const { data: existing, error: readErr } = await supabase
     .from('household_invites')
     .select('token, expires_at')
     .eq('household_id', householdId)
@@ -122,18 +167,21 @@ export async function createHouseholdInvite(userId: string): Promise<string> {
     .limit(1)
     .maybeSingle()
 
+  if (readErr) throw new Error(formatSupabaseError(readErr))
   if (existing?.token) return existing.token
 
+  const token = randomInviteToken()
   const { data, error } = await supabase
     .from('household_invites')
     .insert({
       household_id: householdId,
       created_by: userId,
+      token,
     })
     .select('token')
     .single()
 
-  if (error) throw error
+  if (error) throw new Error(formatSupabaseError(error))
   return data.token as string
 }
 
@@ -146,7 +194,8 @@ export async function fetchHouseholdInfo(userId: string): Promise<HouseholdInfo 
     .eq('user_id', userId)
     .maybeSingle()
 
-  if (error || !membership) return null
+  if (error) throw new Error(formatSupabaseError(error))
+  if (!membership) return null
 
   const { data: household, error: houseErr } = await supabase
     .from('households')
@@ -161,7 +210,7 @@ export async function fetchHouseholdInfo(userId: string): Promise<HouseholdInfo 
     .select('*', { count: 'exact', head: true })
     .eq('household_id', membership.household_id)
 
-  if (countErr) throw countErr
+  if (countErr) throw new Error(formatSupabaseError(countErr))
 
   const { data: invite } = await supabase
     .from('household_invites')
