@@ -2,12 +2,23 @@ import { motion } from 'framer-motion'
 import { Camera, Loader2, Sparkles } from 'lucide-react'
 import { useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
+import PhysicalStatsFields from '../components/PhysicalStatsFields'
 import { compressImage } from '../store/storage'
+
+function parseAge(value: string): number | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  const n = Number.parseInt(trimmed, 10)
+  if (Number.isNaN(n) || n < 0 || n > 30) return undefined
+  return n
+}
 
 export default function OnboardingPage() {
   const { completeOnboarding } = useAuth()
   const [name, setName] = useState('')
   const [breed, setBreed] = useState('')
+  const [age, setAge] = useState('')
+  const [bodyConditionScore, setBodyConditionScore] = useState<number | ''>('')
   const [photo, setPhoto] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -32,6 +43,8 @@ export default function OnboardingPage() {
       await completeOnboarding({
         name: trimmed,
         breed: breed.trim() || undefined,
+        age: parseAge(age),
+        bodyConditionScore: bodyConditionScore === '' ? undefined : bodyConditionScore,
         photo,
       })
     } catch (err) {
@@ -97,15 +110,21 @@ export default function OnboardingPage() {
           />
         </Field>
 
-        <Field label="Breed (optional)">
-          <input
-            type="text"
-            value={breed}
-            onChange={(e) => setBreed(e.target.value)}
-            placeholder="e.g. Golden Retriever"
-            className="w-full bg-transparent outline-none text-[var(--color-text)] placeholder:text-[var(--color-muted)]"
+        <div>
+          <p className="text-sm font-semibold text-[var(--color-text)] mb-1">Physical stats</p>
+          <p className="text-xs text-[var(--color-text-secondary)] mb-3">
+            Used for smarter weekly insights — all optional except name
+          </p>
+          <PhysicalStatsFields
+            variant="onboarding"
+            breed={breed}
+            age={age}
+            bodyConditionScore={bodyConditionScore}
+            onBreedChange={setBreed}
+            onAgeChange={setAge}
+            onBodyConditionScoreChange={setBodyConditionScore}
           />
-        </Field>
+        </div>
 
         {error && (
           <p className="text-sm text-[var(--color-danger)] text-center">{error}</p>

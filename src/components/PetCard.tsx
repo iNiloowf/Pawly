@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import type { Pet } from '../types'
+import { ageLabel } from '../types'
 
 interface PetCardProps {
   pet: Pet
@@ -31,8 +32,12 @@ export default function PetCard({ pet, compact }: PetCardProps) {
           <h1 className={`font-bold text-[var(--color-text)] truncate ${compact ? 'text-lg' : 'text-2xl'}`}>
             {pet.name}
           </h1>
-          {pet.breed && (
-            <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">{pet.breed}</p>
+          {(pet.breed || pet.age != null) && (
+            <p className="text-sm text-[var(--color-text-secondary)] mt-0.5">
+              {[pet.age != null ? `${pet.age} yrs · ${ageLabel(pet.age)}` : null, pet.breed]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
           )}
         </div>
       </div>

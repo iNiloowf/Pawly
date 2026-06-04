@@ -61,7 +61,7 @@ function setGuestMode(value: boolean): void {
 }
 
 function emptyPet(): Pet {
-  return { name: '', breed: undefined, photo: undefined }
+  return { name: '', breed: undefined, photo: undefined, age: undefined, bodyConditionScore: undefined }
 }
 
 function mergeEntries(local: DailyEntry[], cloud: DailyEntry[]): DailyEntry[] {
@@ -81,6 +81,16 @@ function mergeEntries(local: DailyEntry[], cloud: DailyEntry[]): DailyEntry[] {
   return [...map.values()].sort((a, b) => b.date.localeCompare(a.date))
 }
 
+function mergePet(local: Pet, cloud: Pet): Pet {
+  return {
+    name: cloud.name || local.name,
+    breed: cloud.breed ?? local.breed,
+    photo: cloud.photo || local.photo,
+    age: cloud.age ?? local.age,
+    bodyConditionScore: cloud.bodyConditionScore ?? local.bodyConditionScore,
+  }
+}
+
 async function mergeOnLogin(userId: string): Promise<boolean> {
   const local = getData()
   const cloud = await restoreFromCloud(userId)
@@ -92,9 +102,7 @@ async function mergeOnLogin(userId: string): Promise<boolean> {
 
   if (cloud.entries.length > 0) {
     const pet = cloud.onboardingComplete
-      ? cloud.pet.name
-        ? cloud.pet
-        : local.pet
+      ? mergePet(local.pet, cloud.pet)
       : emptyPet()
     replaceData({
       pet,
@@ -105,7 +113,7 @@ async function mergeOnLogin(userId: string): Promise<boolean> {
   }
 
   replaceData({
-    pet: cloud.onboardingComplete ? cloud.pet : emptyPet(),
+    pet: cloud.onboardingComplete ? mergePet(local.pet, cloud.pet) : emptyPet(),
     entries: mergeEntries(local.entries, cloud.entries),
   })
   return cloud.onboardingComplete

@@ -1,32 +1,52 @@
 import { useState, useRef } from 'react'
-import { motion } from 'framer-motion'
-import { Camera, TrendingUp, Moon, Activity, LogOut } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Camera, TrendingUp, Moon, Activity, LogOut, ChevronDown, Info, Utensils } from 'lucide-react'
 import { useAppData } from '../hooks/useAppData'
 import { useAuth } from '../context/AuthContext'
+import PhysicalStatsFields from '../components/PhysicalStatsFields'
 import { updatePet, getWeekEntries, moodScore, levelScore, compressImage } from '../store/storage'
 import { moodEmoji } from '../types'
+import { activitySubtitle, buildWeeklyInsights, foodSubtitle, formatPetContext } from '../lib/petInsights'
+
+function parseAge(value: string): number | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  const n = Number.parseInt(trimmed, 10)
+  if (Number.isNaN(n) || n < 0 || n > 30) return undefined
+  return n
+}
 
 export default function ProfilePage() {
   const { pet } = useAppData()
   const { user, signOut } = useAuth()
   const [name, setName] = useState(pet.name)
   const [breed, setBreed] = useState(pet.breed ?? '')
+  const [age, setAge] = useState(pet.age != null ? String(pet.age) : '')
+  const [bodyConditionScore, setBodyConditionScore] = useState<number | ''>(pet.bodyConditionScore ?? '')
   const [photo, setPhoto] = useState(pet.photo)
+  const [infoOpen, setInfoOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const weekEntries = getWeekEntries()
+  const hasData = weekEntries.length > 0
 
-  const avgMood = weekEntries.length
+  const avgMood = hasData
     ? weekEntries.reduce((s, e) => s + moodScore(e.mood), 0) / weekEntries.length
     : 0
 
-  const avgSleep = weekEntries.length
+  const avgSleep = hasData
     ? weekEntries.reduce((s, e) => s + levelScore(e.sleep), 0) / weekEntries.length
     : 0
 
-  const avgActivity = weekEntries.length
+  const avgActivity = hasData
     ? weekEntries.reduce((s, e) => s + levelScore(e.activity), 0) / weekEntries.length
     : 0
+
+  const avgFood = hasData
+    ? weekEntries.reduce((s, e) => s + levelScore(e.food), 0) / weekEntries.length
+    : 0
+
+  const insights = buildWeeklyInsights(pet, weekEntries, avgActivity, avgFood)
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -36,13 +56,24 @@ export default function ProfilePage() {
     updatePet({ photo: dataUrl })
   }
 
-  const handleSave = () => {
-    updatePet({ name: name.trim() || 'Woody', breed: breed.trim() || undefined, photo })
+  const savePhysicalStats = () => {
+    updatePet({
+      breed: breed.trim() || undefined,
+      age: parseAge(age),
+      bodyConditionScore: bodyConditionScore === '' ? undefined : bodyConditionScore,
+    })
+  }
+
+  const handleSaveName = () => {
+    updatePet({ name: name.trim() || 'Woody', photo })
   }
 
   const moodText = avgMood >= 2.5 ? 'Happy' : avgMood >= 1.5 ? 'Balanced' : 'Needs care'
   const sleepText = avgSleep >= 2.5 ? 'Great' : avgSleep >= 1.5 ? 'Okay' : 'Poor'
   const activityText = avgActivity >= 2.5 ? 'High' : avgActivity >= 1.5 ? 'Normal' : 'Low'
+  const foodText = avgFood >= 2.5 ? 'Ate more' : avgFood >= 1.5 ? 'Normal' : 'Ate less'
+
+  const physicalSummary = formatPetContext(pet)
 
   return (
     <div className="px-5 pt-12 pb-4">
@@ -69,41 +100,90 @@ export default function ProfilePage() {
         <p className="text-xs text-[var(--color-muted)] mt-2">Tap to change photo</p>
       </div>
 
-      <div className="space-y-4 mb-8">
+      <div className="space-y-4 mb-4">
         <Field label="Pet name">
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onBlur={handleSave}
+            onBlur={handleSaveName}
             className="w-full px-4 py-3 bg-white rounded-2xl border border-[var(--color-border)] text-[var(--color-text)] font-medium focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
             placeholder="Your pet's name"
           />
         </Field>
-        <Field label="Breed (optional)">
-          <input
-            type="text"
-            value={breed}
-            onChange={(e) => setBreed(e.target.value)}
-            onBlur={handleSave}
-            className="w-full px-4 py-3 bg-white rounded-2xl border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30"
-            placeholder="e.g. Golden Retriever"
+      </div>
+
+      <div className="mb-8">
+        <button
+          type="button"
+          onClick={() => setInfoOpen((open) => !open)}
+          className="w-full flex items-center justify-between gap-3 px-4 py-4 bg-white rounded-[var(--radius-card)] border border-[var(--color-border)] shadow-[var(--shadow-soft)]"
+        >
+          <div className="flex items-center gap-3 text-left">
+            <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-soft)] flex items-center justify-center shrink-0">
+              <Info size={20} className="text-[var(--color-primary)]" />
+            </div>
+            <div>
+              <p className="font-semibold text-[var(--color-text)]">Information</p>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-0.5 line-clamp-1">
+                {physicalSummary}
+              </p>
+            </div>
+          </div>
+          <ChevronDown
+            size={20}
+            className={`text-[var(--color-muted)] shrink-0 transition-transform ${infoOpen ? 'rotate-180' : ''}`}
           />
-        </Field>
+        </button>
+
+        <AnimatePresence initial={false}>
+          {infoOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-3 p-4 bg-white rounded-[var(--radius-card)] border border-[var(--color-border)] shadow-[var(--shadow-soft)]">
+                <p className="text-sm font-semibold text-[var(--color-text)] mb-1">Physical stats</p>
+                <p className="text-xs text-[var(--color-text-secondary)] mb-4">
+                  Age, breed, and body condition help personalize your weekly analysis.
+                </p>
+                <PhysicalStatsFields
+                  variant="profile"
+                  breed={breed}
+                  age={age}
+                  bodyConditionScore={bodyConditionScore}
+                  onBreedChange={setBreed}
+                  onAgeChange={setAge}
+                  onBodyConditionScoreChange={setBodyConditionScore}
+                />
+                <button
+                  type="button"
+                  onClick={savePhysicalStats}
+                  className="w-full mt-4 py-3 text-sm font-semibold text-[var(--color-primary)] border border-[var(--color-primary-soft)] rounded-full hover:bg-[var(--color-primary-soft)] transition-colors"
+                >
+                  Save information
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <h2 className="text-lg font-bold text-[var(--color-text)] mb-3">This week</h2>
-      <div className="grid grid-cols-1 gap-3 mb-6">
+      <div className="grid grid-cols-1 gap-3 mb-4">
         <StatCard
           icon={<TrendingUp size={20} className="text-[var(--color-primary)]" />}
           title="Average mood"
-          value={weekEntries.length ? `${moodText} ${moodEmoji(avgMood >= 2.5 ? 'happy' : avgMood >= 1.5 ? 'normal' : 'sad')}` : 'No data yet'}
+          value={hasData ? `${moodText} ${moodEmoji(avgMood >= 2.5 ? 'happy' : avgMood >= 1.5 ? 'normal' : 'sad')}` : 'No data yet'}
           subtitle={`${weekEntries.length} check-in${weekEntries.length !== 1 ? 's' : ''} this week`}
         />
         <StatCard
           icon={<Moon size={20} className="text-indigo-500" />}
           title="Sleep trend"
-          value={weekEntries.length ? sleepText : '—'}
+          value={hasData ? sleepText : '—'}
           subtitle="Based on daily sleep ratings"
           bar={avgSleep / 3}
           color="bg-indigo-400"
@@ -111,12 +191,35 @@ export default function ProfilePage() {
         <StatCard
           icon={<Activity size={20} className="text-emerald-500" />}
           title="Activity trend"
-          value={weekEntries.length ? activityText : '—'}
-          subtitle="Based on daily activity ratings"
+          value={hasData ? activityText : '—'}
+          subtitle={activitySubtitle(pet, avgActivity, hasData)}
           bar={avgActivity / 3}
           color="bg-emerald-400"
         />
+        <StatCard
+          icon={<Utensils size={20} className="text-amber-500" />}
+          title="Food trend"
+          value={hasData ? foodText : '—'}
+          subtitle={foodSubtitle(pet, avgFood, hasData)}
+          bar={avgFood / 3}
+          color="bg-amber-400"
+        />
       </div>
+
+      {insights.length > 0 && (
+        <div className="mb-6 space-y-2">
+          <h3 className="text-sm font-semibold text-[var(--color-text-secondary)]">Insights</h3>
+          {insights.map((insight) => (
+            <div
+              key={insight.title}
+              className="bg-white rounded-2xl p-4 border border-[var(--color-border)] shadow-[var(--shadow-soft)]"
+            >
+              <p className="text-sm font-semibold text-[var(--color-text)]">{insight.title}</p>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-1 leading-relaxed">{insight.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="bg-[var(--color-primary-soft)] rounded-[var(--radius-card)] p-5 text-center mb-6">
         <p className="text-sm text-[var(--color-primary)] font-medium">

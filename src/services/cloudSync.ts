@@ -61,7 +61,7 @@ export async function restoreFromCloud(userId: string): Promise<AppData & { onbo
 
   const { data: profile, error: profileErr } = await supabase
     .from('profiles')
-    .select('pet_name, pet_breed, pet_photo_url, onboarding_complete')
+    .select('pet_name, pet_breed, pet_photo_url, pet_age, pet_body_condition_score, onboarding_complete')
     .eq('id', userId)
     .maybeSingle()
 
@@ -82,6 +82,8 @@ export async function restoreFromCloud(userId: string): Promise<AppData & { onbo
     name: profile?.pet_name ?? DEFAULT_PET.name,
     breed: profile?.pet_breed ?? undefined,
     photo: profile?.pet_photo_url ?? undefined,
+    age: profile?.pet_age ?? undefined,
+    bodyConditionScore: profile?.pet_body_condition_score ?? undefined,
   }
 
   const entries: DailyEntry[] = (rows ?? []).map((r) => ({
@@ -110,6 +112,8 @@ export async function syncToCloud(userId: string, data: AppData): Promise<void> 
     pet_name: data.pet.name,
     pet_breed: data.pet.breed ?? null,
     pet_photo_url: petPhotoUrl ?? null,
+    pet_age: data.pet.age ?? null,
+    pet_body_condition_score: data.pet.bodyConditionScore ?? null,
     onboarding_complete: isOnboardingLocal(userId),
     updated_at: new Date().toISOString(),
   })
@@ -133,6 +137,8 @@ export async function pushPet(userId: string, pet: Pet, onboardingComplete?: boo
     pet_name: pet.name,
     pet_breed: pet.breed ?? null,
     pet_photo_url: petPhotoUrl ?? null,
+    pet_age: pet.age ?? null,
+    pet_body_condition_score: pet.bodyConditionScore ?? null,
     onboarding_complete: onboardingComplete ?? isOnboardingLocal(userId),
     updated_at: new Date().toISOString(),
   })

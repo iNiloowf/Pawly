@@ -6,12 +6,19 @@ create table if not exists public.profiles (
   pet_name text not null default 'Woody',
   pet_breed text,
   pet_photo_url text,
+  pet_age smallint check (pet_age is null or (pet_age >= 0 and pet_age <= 30)),
+  pet_body_condition_score smallint check (
+    pet_body_condition_score is null
+    or (pet_body_condition_score >= 1 and pet_body_condition_score <= 9)
+  ),
   onboarding_complete boolean not null default false,
   updated_at timestamptz not null default now()
 );
 
 -- If table already exists, run this migration:
 -- alter table public.profiles add column if not exists onboarding_complete boolean not null default false;
+-- alter table public.profiles add column if not exists pet_age smallint check (pet_age is null or (pet_age >= 0 and pet_age <= 30));
+-- alter table public.profiles add column if not exists pet_body_condition_score smallint check (pet_body_condition_score is null or (pet_body_condition_score >= 1 and pet_body_condition_score <= 9));
 -- update public.profiles set onboarding_complete = true;
 
 -- Daily journal entries

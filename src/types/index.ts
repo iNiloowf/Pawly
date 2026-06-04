@@ -16,6 +16,10 @@ export interface Pet {
   name: string
   photo?: string
   breed?: string
+  /** Age in whole years */
+  age?: number
+  /** Body condition score 1–9 (optional) */
+  bodyConditionScore?: number
 }
 
 export interface AppData {
@@ -75,6 +79,30 @@ export function todayKey(): string {
 export const DEFAULT_PET: Pet = {
   name: 'Woody',
   breed: 'Golden Retriever',
+  age: 3,
+}
+
+export const BCS_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: '1 — Very thin' },
+  { value: 2, label: '2 — Thin' },
+  { value: 3, label: '3 — Lean' },
+  { value: 4, label: '4 — Slightly lean' },
+  { value: 5, label: '5 — Ideal' },
+  { value: 6, label: '6 — Slightly heavy' },
+  { value: 7, label: '7 — Heavy' },
+  { value: 8, label: '8 — Obese' },
+  { value: 9, label: '9 — Severely obese' },
+]
+
+export function bodyConditionLabel(bcs: number): string {
+  return BCS_OPTIONS.find((o) => o.value === bcs)?.label ?? `BCS ${bcs}`
+}
+
+export function ageLabel(age: number): string {
+  if (age < 1) return 'Puppy'
+  if (age < 3) return 'Young'
+  if (age < 7) return 'Adult'
+  return 'Senior'
 }
 
 export const DEFAULT_ENTRY: Omit<DailyEntry, 'date'> = {
