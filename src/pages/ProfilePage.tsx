@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, TrendingUp, Moon, Activity, Cloud, LogOut, RefreshCw, User } from 'lucide-react'
+import { Camera, TrendingUp, Moon, Activity, LogOut } from 'lucide-react'
 import { useAppData } from '../hooks/useAppData'
 import { useAuth } from '../context/AuthContext'
 import { updatePet, getWeekEntries, moodScore, levelScore, compressImage } from '../store/storage'
@@ -8,7 +8,7 @@ import { moodEmoji } from '../types'
 
 export default function ProfilePage() {
   const { pet } = useAppData()
-  const { user, isGuest, cloudEnabled, syncing, signOut, refreshCloud } = useAuth()
+  const { user, signOut } = useAuth()
   const [name, setName] = useState(pet.name)
   const [breed, setBreed] = useState(pet.breed ?? '')
   const [photo, setPhoto] = useState(pet.photo)
@@ -47,56 +47,6 @@ export default function ProfilePage() {
   return (
     <div className="px-5 pt-12 pb-4">
       <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Profile</h1>
-
-      <div className="bg-white rounded-[var(--radius-card)] p-4 shadow-[var(--shadow-soft)] border border-[var(--color-border)] mb-6">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[var(--color-primary-soft)] flex items-center justify-center shrink-0">
-            {user ? <Cloud size={20} className="text-[var(--color-primary)]" /> : <User size={20} className="text-[var(--color-muted)]" />}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-[var(--color-text)]">
-              {user ? 'Cloud account' : isGuest ? 'Guest mode' : 'Not signed in'}
-            </p>
-            {user ? (
-              <p className="text-xs text-[var(--color-text-secondary)] mt-0.5 truncate">{user.email}</p>
-            ) : (
-              <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                Data only on this device (localStorage)
-              </p>
-            )}
-            {user && cloudEnabled && (
-              <p className="text-xs text-[var(--color-success)] mt-1 font-medium">
-                Synced to Supabase — restore on any device
-              </p>
-            )}
-          </div>
-        </div>
-        {user && cloudEnabled && (
-          <button
-            type="button"
-            onClick={() => refreshCloud()}
-            disabled={syncing}
-            className="mt-3 w-full py-2.5 text-sm font-medium text-[var(--color-primary)] border border-[var(--color-primary-soft)] rounded-full flex items-center justify-center gap-2 hover:bg-[var(--color-primary-soft)] disabled:opacity-60"
-          >
-            <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
-            Restore from cloud
-          </button>
-        )}
-        {user ? (
-          <button
-            type="button"
-            onClick={() => signOut()}
-            className="mt-2 w-full py-2.5 text-sm font-medium text-[var(--color-danger)] rounded-full flex items-center justify-center gap-2 hover:bg-red-50"
-          >
-            <LogOut size={16} />
-            Sign out
-          </button>
-        ) : isGuest && cloudEnabled ? (
-          <p className="mt-3 text-xs text-center text-[var(--color-text-secondary)]">
-            Sign in from the welcome screen to back up photos &amp; journal to the cloud.
-          </p>
-        ) : null}
-      </div>
 
       <div className="flex flex-col items-center mb-8">
         <button
@@ -168,13 +118,24 @@ export default function ProfilePage() {
         />
       </div>
 
-      <div className="bg-[var(--color-primary-soft)] rounded-[var(--radius-card)] p-5 text-center">
+      <div className="bg-[var(--color-primary-soft)] rounded-[var(--radius-card)] p-5 text-center mb-6">
         <p className="text-sm text-[var(--color-primary)] font-medium">
           {weekEntries.length >= 5
             ? `Amazing! ${name} has ${weekEntries.length} check-ins this week 🎉`
             : `Keep building the habit — check in daily with ${name}!`}
         </p>
       </div>
+
+      {user && (
+        <button
+          type="button"
+          onClick={() => signOut()}
+          className="w-full py-3.5 text-sm font-medium text-[var(--color-danger)] rounded-[var(--radius-button)] border border-red-100 bg-white flex items-center justify-center gap-2 hover:bg-red-50 transition-colors"
+        >
+          <LogOut size={18} />
+          Sign out
+        </button>
+      )}
     </div>
   )
 }
