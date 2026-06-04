@@ -65,23 +65,48 @@ function persistCache(): void {
 let cache: AppData = loadRaw()
 let hydrated = false
 
+export type AppSnapshot = AppData & { _v: number }
+
+let appSnapshot: AppSnapshot | null = null
+
+function buildAppSnapshot(): AppSnapshot {
+  appSnapshot = {
+    pet: cache.pet,
+    entries: cache.entries,
+    _v: snapshotVersion,
+  }
+  return appSnapshot
+}
+
+export function getAppSnapshot(): AppSnapshot {
+  if (!appSnapshot || appSnapshot._v !== snapshotVersion) {
+    buildAppSnapshot()
+  }
+  return appSnapshot!
+}
+
 export async function hydratePhotosFromIdb(): Promise<void> {
   if (hydrated) return
   hydrated = true
-  const entries = await hydrateEntryPhotos(cache.entries)
-  let pet = cache.pet
-  if (!pet.photo) {
-    const petPhoto = await loadPhotoRef('pet-profile')
-    if (petPhoto) pet = { ...pet, photo: petPhoto }
+  try {
+    const entries = await hydrateEntryPhotos(cache.entries)
+    let pet = cache.pet
+    if (!pet.photo) {
+      const petPhoto = await loadPhotoRef('pet-profile')
+      if (petPhoto) pet = { ...pet, photo: petPhoto }
+    }
+    cache = { ...cache, entries, pet }
+    notify()
+  } catch (err) {
+    console.warn('[Pawly] Could not load photos from IndexedDB', err)
   }
-  cache = { ...cache, entries, pet }
-  notify()
 }
 
 const listeners = new Set<() => void>()
 
 function notify(): void {
   snapshotVersion++
+  buildAppSnapshot()
   listeners.forEach((fn) => fn())
 }
 

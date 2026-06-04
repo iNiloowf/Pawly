@@ -6,10 +6,10 @@ import { useAppData } from '../hooks/useAppData'
 import { moodEmoji, sleepLabel, foodLabel, activityLabel, moodLabel } from '../types'
 
 export default function HistoryPage() {
-  const { entries: rawEntries, _v } = useAppData()
+  const { entries: rawEntries } = useAppData()
   const entries = useMemo(
     () => [...rawEntries].sort((a, b) => b.date.localeCompare(a.date)),
-    [rawEntries, _v],
+    [rawEntries],
   )
   const entryMap = useMemo(() => new Map(entries.map((e) => [e.date, e])), [entries])
 

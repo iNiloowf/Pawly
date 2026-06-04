@@ -24,13 +24,13 @@ const GRID_PATTERNS = [
 ]
 
 export default function GalleryPage() {
-  const { entries: rawEntries, _v } = useAppData()
+  const { entries: rawEntries } = useAppData()
   const photos = useMemo(
     () =>
       [...rawEntries]
         .filter((e) => Boolean(e.photo))
         .sort((a, b) => b.date.localeCompare(a.date)),
-    [rawEntries, _v],
+    [rawEntries],
   )
   const [selected, setSelected] = useState<DailyEntry | null>(null)
 
