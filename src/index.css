@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #7C5CFF;
+  --color-primary-light: #9B82FF;
+  --color-primary-soft: #EDE9FF;
+  --color-surface: #FAFAFC;
+  --color-card: #FFFFFF;
+  --color-muted: #8E8E93;
+  --color-text: #1C1C1E;
+  --color-text-secondary: #636366;
+  --color-border: #F0F0F5;
+  --color-success: #34C759;
+  --color-warning: #FF9500;
+  --color-danger: #FF3B30;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius-card: 20px;
+  --radius-button: 9999px;
+  --shadow-soft: 0 2px 16px rgba(124, 92, 255, 0.08);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.06);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-surface);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#root {
+  max-width: 430px;
+  margin: 0 auto;
+  position: relative;
+  background: var(--color-surface);
+  min-height: 100%;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.06);
+}
+
+::-webkit-scrollbar {
+  width: 0;
+  background: transparent;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
